@@ -216,6 +216,8 @@ def process_uploaded_files(uploaded_files: List, api_key: str) -> None:
     """Process multiple uploaded CSV files and display combined analysis."""
     total_rows = 0
     all_combined_data: List[Dict[str, Any]] = []
+    api_fetch_count = 0
+    cache_fetch_count = 0
     analyzer: Optional[YouTubeAnalyzer] = None
 
     try:
@@ -254,10 +256,15 @@ def process_uploaded_files(uploaded_files: List, api_key: str) -> None:
                     continue
 
                 status_text.text(f"📡 Fetching API data for {len(video_ids)} videos in {uploaded_file.name}...")
-                video_data, cache_marker = analyzer.get_video_data(video_ids)
+                video_data, marker = analyzer.get_video_data(video_ids)
 
                 combined_data = combine_csv_and_api_data(video_ids, csv_data, video_data, analyzer)
                 all_combined_data.extend(combined_data)
+
+                if marker:
+                    cache_fetch_count += len(video_ids)
+                else:
+                    api_fetch_count += len(video_ids)
 
                 progress = file_index / len(uploaded_files)
                 progress_bar.progress(int(progress * 100))
@@ -268,7 +275,10 @@ def process_uploaded_files(uploaded_files: List, api_key: str) -> None:
             st.warning("No valid video data found across uploaded files.")
             return
 
-        st.success(f"✅ Processed {len(uploaded_files)} file(s). Total rows: {total_rows}.")
+        st.success(
+            f"✅ Processed {len(uploaded_files)} file(s). Total rows: {total_rows}. "
+            f"API: {api_fetch_count}, cache: {cache_fetch_count}"
+        )
 
         total_processed = len(all_combined_data)
         api_matched = sum(1 for v in all_combined_data if v.get('api_views', 0) > 0)
@@ -287,9 +297,6 @@ def process_uploaded_files(uploaded_files: List, api_key: str) -> None:
         display_summary(categories)
         st.markdown("---")
         display_video_analysis(categories)
-
-        if cache_marker:
-            st.info("♻️ Cached API data reused (valid up to 1 hour)")
 
         if st.button("💾 Download Combined Data as CSV"):
             processed_df = _create_download_dataframe(all_combined_data)
