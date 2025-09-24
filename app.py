@@ -363,6 +363,11 @@ def main():
 
             div[data-testid="stSidebar"] section {
                 padding-top: 2rem;
+                max-width: 360px;
+            }
+
+            div[data-testid="stSidebarContent"] {
+                width: 360px !important;
             }
         </style>
         """,
@@ -381,17 +386,6 @@ def main():
     if not api_key:
         # Show message about needing API key before CSV upload
         st.info("👆 Please enter your YouTube API key in the sidebar to continue")
-        st.markdown("---")
-        with st.expander("ℹ️ How to get YouTube API Key"):
-            st.markdown(
-                """
-                1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-                2. Create a new project or select existing one
-                3. Enable **YouTube Data API v3**
-                4. Create credentials (API Key)
-                5. Copy the API key and paste it in the sidebar
-                """
-            )
         st.stop()
 
     # File upload section (only shown after API key validation)
