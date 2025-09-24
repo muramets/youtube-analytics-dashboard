@@ -64,7 +64,7 @@ def validate_csv_structure(df: pd.DataFrame) -> Tuple[bool, str]:
 
 
 @st.cache_data(ttl=1800)  # Cache for 30 minutes
-def extract_video_data_from_csv(data_df: pd.DataFrame, analyzer: YouTubeAnalyzer) -> Tuple[List[str], Dict[str, Dict[str, Any]]]:
+def extract_video_data_from_csv(data_df: pd.DataFrame, _analyzer: YouTubeAnalyzer) -> Tuple[List[str], Dict[str, Dict[str, Any]]]:
     """Extract video IDs and data from CSV with caching."""
     video_ids = []
     csv_data = {}
@@ -73,7 +73,7 @@ def extract_video_data_from_csv(data_df: pd.DataFrame, analyzer: YouTubeAnalyzer
     for idx, row in data_df.iterrows():
         try:
             traffic_source = str(row.iloc[0])
-            video_id = analyzer.extract_video_id(traffic_source)
+            video_id = _analyzer.extract_video_id(traffic_source)
             
             if video_id:
                 # Avoid duplicate video IDs
@@ -214,18 +214,8 @@ def process_uploaded_file(uploaded_file, api_key: str) -> None:
         except UnicodeDecodeError:
             df = pd.read_csv(uploaded_file, encoding='latin-1')
         
-        # Display file info with more details
-        st.success(f"✅ File uploaded successfully!")
-        
-        # Show file information in an expander
-        with st.expander("📋 File Details", expanded=False):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total Rows", len(df))
-            with col2:
-                st.metric("Columns", len(df.columns))
-            with col3:
-                st.metric("File Size", f"{uploaded_file.size / 1024:.1f} KB")
+        # Display file info
+        st.success(f"✅ File uploaded successfully! Found {len(df)} rows.")
         
         # Validate CSV structure
         is_valid, error_msg = validate_csv_structure(df)
@@ -357,25 +347,51 @@ def _create_download_dataframe(combined_data: List[Dict[str, Any]]) -> pd.DataFr
 
 def main():
     """Main application function."""
-    # Add container for centered content
-    st.title("📊 YouTube Analytics Dashboard")
-    st.markdown("<p style='text-align: center; color: #666; margin-bottom: 2rem;'>Upload your YouTube analytics CSV file and analyze video performance by time periods</p>", unsafe_allow_html=True)
-    
-    # Setup sidebar and get API key
-    api_key = setup_sidebar()
-    if not api_key:
-        st.stop()
-    
-    # File upload
-    st.header("📁 Upload CSV File")
-    uploaded_file = st.file_uploader(
-        "Choose your YouTube analytics CSV file",
-        type="csv",
-        help="Upload the CSV file exported from YouTube Analytics"
-    )
-    
-    if uploaded_file is not None:
-        process_uploaded_file(uploaded_file, api_key)
+    # Create centered container for the entire app
+    with st.container():
+        # Center content with CSS
+        st.markdown("""
+        <style>
+        .main > div {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        st.title("📊 YouTube Analytics Dashboard")
+        st.markdown("<p style='text-align: center; color: #666; margin-bottom: 2rem;'>Upload your YouTube analytics CSV file and analyze video performance by time periods</p>", unsafe_allow_html=True)
+        
+        # Setup sidebar and get API key
+        api_key = setup_sidebar()
+        
+        if not api_key:
+            # Show message about needing API key before CSV upload
+            st.info("👆 Please enter your YouTube API key in the sidebar to continue")
+            st.markdown("---")
+            with st.expander("ℹ️ How to get YouTube API Key"):
+                st.markdown("""
+                1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+                2. Create a new project or select existing one
+                3. Enable **YouTube Data API v3**
+                4. Create credentials (API Key)
+                5. Copy the API key and paste it in the sidebar
+                """)
+            st.stop()
+        
+        # File upload section (only shown after API key validation)
+        st.header("📁 Upload CSV File")
+        st.markdown("✅ API key validated - you can now upload your CSV file")
+        
+        uploaded_file = st.file_uploader(
+            "Choose your YouTube analytics CSV file",
+            type="csv",
+            help="Upload the CSV file exported from YouTube Analytics"
+        )
+        
+        if uploaded_file is not None:
+            process_uploaded_file(uploaded_file, api_key)
 
 if __name__ == "__main__":
     main()

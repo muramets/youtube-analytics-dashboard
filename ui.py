@@ -11,17 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 def inject_base_css() -> None:
-    """Inject base CSS to center content and improve visuals."""
+    """Inject base CSS for improved visuals."""
     st.markdown(
         """
 <style>
-    /* Center main content within a max-width container */
-    .main > div {
-        max-width: 1100px;
-        margin: 0 auto;
-        padding: 2rem 1.25rem;
-    }
-
     /* Streamlit dataframe container full width, but capped height for scroll */
     .stDataFrame { width: 100%; }
 
