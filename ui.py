@@ -118,7 +118,7 @@ def display_video_table(
                 "CTR (%)": ctr_display,
                 "Watch Time (hrs)": watch_time,
                 "Video URL": video_url,
-                "Type": video.get("type", "Unknown"),
+                "Type": video.get("content_type", "Unknown"),
             })
 
         except Exception as e:
