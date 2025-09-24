@@ -363,11 +363,22 @@ def main():
 
             div[data-testid="stSidebar"] section {
                 padding-top: 2rem;
+                width: 100%;
                 max-width: 360px;
             }
 
             div[data-testid="stSidebarContent"] {
-                width: 360px !important;
+                width: 100% !important;
+                max-width: 360px;
+                margin: 0 auto;
+            }
+
+            div[data-testid="stSidebarContent"] .stTextInput > div > div {
+                width: 100%;
+            }
+
+            div[data-testid="stSidebarContent"] input {
+                width: 100% !important;
             }
         </style>
         """,
