@@ -53,7 +53,7 @@ class YouTubeAnalyzer:
             ids_string = ",".join(batch_ids)
 
             params = {
-                "part": "snippet,statistics",
+                "part": "snippet,statistics,contentDetails",
                 "id": ids_string,
                 "key": _self.api_key,
             }
@@ -81,6 +81,7 @@ class YouTubeAnalyzer:
                             "published_at": snippet.get("publishedAt", ""),
                             "view_count": int(statistics.get("viewCount", 0)),
                             "thumbnail_url": snippet.get("thumbnails", {}).get("medium", {}).get("url", ""),
+                            "content_type": "Live" if snippet.get("liveBroadcastContent", "none") == "live" else "Long form",
                         }
 
                     # Rate limiting

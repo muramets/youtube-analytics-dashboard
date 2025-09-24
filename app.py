@@ -134,7 +134,8 @@ def combine_csv_and_api_data(video_ids: List[str], csv_data: Dict[str, Dict[str,
                     'published_at': api_data.get('published_at', ''),
                     'api_views': api_data.get('view_count', 0),
                     'thumbnail_url': api_data.get('thumbnail_url', ''),
-                    'category': category
+                    'category': category,
+                    'content_type': api_data.get('content_type', 'Unknown')
                 }
             else:
                 # Video not found in API, use default values
@@ -144,7 +145,8 @@ def combine_csv_and_api_data(video_ids: List[str], csv_data: Dict[str, Dict[str,
                     'published_at': '',
                     'api_views': 0,
                     'thumbnail_url': '',
-                    'category': 'Unknown'
+                    'category': 'Unknown',
+                    'content_type': 'Unknown'
                 }
             
             combined_data.append(combined_video)

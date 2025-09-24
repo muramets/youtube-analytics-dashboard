@@ -43,35 +43,6 @@ def inject_base_css() -> None:
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
 
-    /* Table header styling */
-    div[data-testid="stDataFrame"] table thead th {
-        text-align: center !important;
-        white-space: normal !important;
-    }
-
-    div[data-testid="stDataFrame"] table thead th div[data-testid="columnHeaderCell"] {
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-        height: auto !important;
-        padding: 6px 8px !important;
-    }
-
-    div[data-testid="stDataFrame"] table thead th div[data-testid="columnHeaderText"] {
-        white-space: normal !important;
-        overflow-wrap: anywhere !important;
-        text-align: center !important;
-        line-height: 1.2 !important;
-        display: block !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-    }
-
-    div[data-testid="stDataFrame"] table thead th div[data-testid="columnHeaderText"] span {
-        white-space: normal !important;
-        overflow-wrap: anywhere !important;
-    }
-
     /* Headings */
     h1 { text-align: center; margin-bottom: 0.5rem; }
     h2 { margin-top: 1.5rem; margin-bottom: 0.5rem; }
@@ -147,6 +118,7 @@ def display_video_table(
                 "CTR (%)": ctr_display,
                 "Watch Time (hrs)": watch_time,
                 "Video URL": video_url,
+                "Type": video.get("type", "Unknown"),
             })
 
         except Exception as e:
@@ -160,6 +132,7 @@ def display_video_table(
                 "CTR (%)": "0.00%",
                 "Watch Time (hrs)": 0.0,
                 "Video URL": "",
+                "Type": "Error",
             })
 
     if not df_rows:
@@ -178,6 +151,7 @@ def display_video_table(
         "CTR (%)",
         "Watch Time (hrs)",
         "Video URL",
+        "Type",
     ]
     df = df[desired_columns]
     
@@ -225,6 +199,7 @@ def display_video_table(
                 width="small", 
                 display_text="Open ↗"
             ),
+            "Type": st.column_config.TextColumn("Type", width="small"),
         },
     )
 
