@@ -47,10 +47,9 @@ def inject_base_css() -> None:
     h1 { text-align: center; margin-bottom: 0.5rem; }
     h2 { margin-top: 1.5rem; margin-bottom: 0.5rem; }
     
-    /* Ensure all content respects the centered layout */
-    .main .block-container {
-        max-width: 1200px !important;
-        padding: 2rem 1rem !important;
+    /* Clean styling for centered containers */
+    div[data-testid="stVerticalBlock"] {
+        gap: 1rem;
     }
 </style>
         """,

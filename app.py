@@ -174,35 +174,37 @@ def categorize_videos(combined_data: List[Dict[str, Any]]) -> Dict[str, List[Dic
 
 def display_summary(categories: Dict[str, List[Dict[str, Any]]]) -> None:
     """Display analytics summary."""
-    st.header("📈 Analytics Summary")
-    
-    # Filter out empty categories for metrics
-    non_empty_categories = [(name, videos) for name, videos in categories.items() if videos]
-    
-    if non_empty_categories:
-        # Create columns based on non-empty categories
-        summary_cols = st.columns(min(len(non_empty_categories), 5))
+    with st.container(width=1200):
+        st.header("📈 Analytics Summary")
         
-        for idx, (category_name, videos) in enumerate(non_empty_categories[:5]):
-            with summary_cols[idx]:
-                # Shorten category names for display
-                display_name = category_name.replace(" ago", "").replace("More than ", "3+ ")
-                st.metric(display_name, len(videos))
+        # Filter out empty categories for metrics
+        non_empty_categories = [(name, videos) for name, videos in categories.items() if videos]
+        
+        if non_empty_categories:
+            # Create columns based on non-empty categories
+            summary_cols = st.columns(min(len(non_empty_categories), 5))
+            
+            for idx, (category_name, videos) in enumerate(non_empty_categories[:5]):
+                with summary_cols[idx]:
+                    # Shorten category names for display
+                    display_name = category_name.replace(" ago", "").replace("More than ", "3+ ")
+                    st.metric(display_name, len(videos))
 
 
 def display_video_analysis(categories: Dict[str, List[Dict[str, Any]]]) -> None:
     """Display video analysis by time periods."""
-    st.header("📺 Video Analysis by Time Periods")
-    
-    # Check if there are any videos to display
-    has_videos = any(len(videos) > 0 for videos in categories.values())
-    
-    if has_videos:
-        for category_name, videos in categories.items():
-            if videos:  # Only show categories with videos
-                display_video_table(videos, category_name)
-    else:
-        st.warning("No videos found to analyze. Please check your CSV file format.")
+    with st.container(width=1200):
+        st.header("📺 Video Analysis by Time Periods")
+        
+        # Check if there are any videos to display
+        has_videos = any(len(videos) > 0 for videos in categories.values())
+        
+        if has_videos:
+            for category_name, videos in categories.items():
+                if videos:  # Only show categories with videos
+                    display_video_table(videos, category_name)
+        else:
+            st.warning("No videos found to analyze. Please check your CSV file format.")
 
 
 def process_uploaded_file(uploaded_file, api_key: str) -> None:
@@ -347,61 +349,40 @@ def _create_download_dataframe(combined_data: List[Dict[str, Any]]) -> pd.DataFr
 
 def main():
     """Main application function."""
-    # Apply centering CSS first, before any content
-    st.markdown("""
-    <style>
-    .main .block-container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 2rem 1rem;
-    }
-    
-    /* Ensure sidebar doesn't affect centering */
-    .main {
-        padding: 0;
-    }
-    
-    /* Center the main content area */
-    section.main > div {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 2rem 1rem;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    st.title("📊 YouTube Analytics Dashboard")
-    st.markdown("<p style='text-align: center; color: #666; margin-bottom: 2rem;'>Upload your YouTube analytics CSV file and analyze video performance by time periods</p>", unsafe_allow_html=True)
-    
-    # Setup sidebar and get API key
-    api_key = setup_sidebar()
-    
-    if not api_key:
-        # Show message about needing API key before CSV upload
-        st.info("👆 Please enter your YouTube API key in the sidebar to continue")
-        st.markdown("---")
-        with st.expander("ℹ️ How to get YouTube API Key"):
-            st.markdown("""
-            1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-            2. Create a new project or select existing one
-            3. Enable **YouTube Data API v3**
-            4. Create credentials (API Key)
-            5. Copy the API key and paste it in the sidebar
-            """)
-        st.stop()
-    
-    # File upload section (only shown after API key validation)
-    st.header("📁 Upload CSV File")
-    st.markdown("✅ API key validated - you can now upload your CSV file")
-    
-    uploaded_file = st.file_uploader(
-        "Choose your YouTube analytics CSV file",
-        type="csv",
-        help="Upload the CSV file exported from YouTube Analytics"
-    )
-    
-    if uploaded_file is not None:
-        process_uploaded_file(uploaded_file, api_key)
+    # Use modern Streamlit container with fixed width for centering
+    with st.container(width=1200):
+        st.title("📊 YouTube Analytics Dashboard")
+        st.markdown("<p style='text-align: center; color: #666; margin-bottom: 2rem;'>Upload your YouTube analytics CSV file and analyze video performance by time periods</p>", unsafe_allow_html=True)
+        
+        # Setup sidebar and get API key
+        api_key = setup_sidebar()
+        
+        if not api_key:
+            # Show message about needing API key before CSV upload
+            st.info("👆 Please enter your YouTube API key in the sidebar to continue")
+            st.markdown("---")
+            with st.expander("ℹ️ How to get YouTube API Key"):
+                st.markdown("""
+                1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+                2. Create a new project or select existing one
+                3. Enable **YouTube Data API v3**
+                4. Create credentials (API Key)
+                5. Copy the API key and paste it in the sidebar
+                """)
+            st.stop()
+        
+        # File upload section (only shown after API key validation)
+        st.header("📁 Upload CSV File")
+        st.markdown("✅ API key validated - you can now upload your CSV file")
+        
+        uploaded_file = st.file_uploader(
+            "Choose your YouTube analytics CSV file",
+            type="csv",
+            help="Upload the CSV file exported from YouTube Analytics"
+        )
+        
+        if uploaded_file is not None:
+            process_uploaded_file(uploaded_file, api_key)
 
 if __name__ == "__main__":
     main()
