@@ -349,6 +349,29 @@ def _create_download_dataframe(combined_data: List[Dict[str, Any]]) -> pd.DataFr
 
 def main():
     """Main application function."""
+    # Add CSS to center the fixed-width container
+    st.markdown("""
+    <style>
+    /* Center containers with fixed width */
+    div[data-testid="stVerticalBlock"] > div[style*="width: 1200px"] {
+        margin: 0 auto !important;
+    }
+    
+    /* Alternative approach for container centering */
+    .main .block-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    /* Ensure fixed width containers are centered */
+    div[style*="width: 1200px"] {
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     # Use modern Streamlit container with fixed width for centering
     with st.container(width=1200):
         st.title("📊 YouTube Analytics Dashboard")

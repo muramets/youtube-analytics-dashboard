@@ -47,6 +47,12 @@ def inject_base_css() -> None:
     h1 { text-align: center; margin-bottom: 0.5rem; }
     h2 { margin-top: 1.5rem; margin-bottom: 0.5rem; }
     
+    /* Center fixed-width containers */
+    div[style*="width: 1200px"] {
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+    
     /* Clean styling for centered containers */
     div[data-testid="stVerticalBlock"] {
         gap: 1rem;
