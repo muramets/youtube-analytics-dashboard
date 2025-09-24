@@ -91,9 +91,41 @@ The application will be available at your custom Streamlit URL.
 
 ```
 ├── app.py              # Main Streamlit application
-├── requirements.txt    # Python dependencies
-└── README.md          # This file
+├── youtube_analyzer.py # YouTube API wrapper with caching
+├── ui.py              # UI components and styling
+├── utils.py           # Utility functions
+├── requirements.txt   # Python dependencies
+└── README.md         # This file
 ```
+
+## Recent Improvements (v2.0)
+
+### Code Quality & Architecture
+- **Modular Design**: Split monolithic code into focused modules
+- **Type Safety**: Added comprehensive type hints throughout
+- **Error Handling**: Robust error handling with user-friendly messages
+- **Logging**: Added structured logging for debugging
+
+### Performance Optimizations
+- **Caching**: Added Streamlit caching for API calls and data processing
+- **Rate Limiting**: Intelligent API rate limiting with exponential backoff
+- **Batch Processing**: Efficient batch processing of large datasets
+- **Memory Management**: Optimized memory usage for large CSV files
+
+### User Experience Enhancements
+- **Enhanced Progress Tracking**: Real-time progress with detailed status updates
+- **Better Error Messages**: Clear, actionable error messages with help text
+- **File Validation**: Comprehensive CSV validation with format guidance
+- **Processing Summary**: Detailed summary of processing results
+- **Data Export**: Option to download processed data as CSV
+- **Responsive UI**: Improved mobile and desktop experience
+
+### Technical Improvements
+- **Session Management**: Better handling of API sessions
+- **Input Validation**: Comprehensive validation of all inputs
+- **Encoding Support**: Support for multiple CSV encodings (UTF-8, Latin-1)
+- **Duplicate Handling**: Smart handling of duplicate video IDs
+- **API Resilience**: Retry logic for failed API calls
 
 ## Troubleshooting
 

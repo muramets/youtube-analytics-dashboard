@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import time
+from typing import Dict, List, Optional, Tuple, Any
 
 from youtube_analyzer import YouTubeAnalyzer
 from ui import inject_base_css, display_video_table
@@ -14,15 +15,16 @@ st.set_page_config(
 )
 
 inject_base_css()
- 
- 
 
-def main():
-    # Add container for centered content
-    st.title("📊 YouTube Analytics Dashboard")
-    st.markdown("<p style='text-align: center; color: #666; margin-bottom: 2rem;'>Upload your YouTube analytics CSV file and analyze video performance by time periods</p>", unsafe_allow_html=True)
-    
-    # Sidebar for API key
+
+@st.cache_data
+def validate_api_key(api_key: str) -> bool:
+    """Validate YouTube API key format."""
+    return len(api_key) >= 20
+
+
+def setup_sidebar() -> Optional[str]:
+    """Setup sidebar with API key configuration."""
     with st.sidebar:
         st.header("🔑 Configuration")
         
@@ -34,13 +36,335 @@ def main():
         )
         
         if api_key:
-            if len(api_key) < 20:  # Basic validation
+            if not validate_api_key(api_key):
                 st.error("❌ API key seems too short. Please check your key.")
-                st.stop()
+                return None
             st.success("✅ API Key provided")
+            return api_key
         else:
             st.warning("⚠️ Please enter your YouTube API key to continue")
-            st.stop()
+            return None
+
+
+def validate_csv_structure(df: pd.DataFrame) -> Tuple[bool, str]:
+    """Validate CSV file structure and format."""
+    if len(df) < 3:  # Need header + total + at least one data row
+        return False, "CSV file must have at least 3 rows (header, total, and data)"
+    
+    # Skip header and total rows
+    data_df = df.iloc[2:]
+    
+    if len(data_df) == 0:
+        return False, "No data rows found in the CSV file"
+    
+    if len(data_df.columns) < 8:
+        return False, f"CSV file has insufficient columns. Expected at least 8, found {len(data_df.columns)}"
+    
+    return True, ""
+
+
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
+def extract_video_data_from_csv(data_df: pd.DataFrame, analyzer: YouTubeAnalyzer) -> Tuple[List[str], Dict[str, Dict[str, Any]]]:
+    """Extract video IDs and data from CSV with caching."""
+    video_ids = []
+    csv_data = {}
+    errors_count = 0
+    
+    for idx, row in data_df.iterrows():
+        try:
+            traffic_source = str(row.iloc[0])
+            video_id = analyzer.extract_video_id(traffic_source)
+            
+            if video_id:
+                # Avoid duplicate video IDs
+                if video_id not in csv_data:
+                    video_ids.append(video_id)
+                    csv_data[video_id] = {
+                        'video_id': video_id,
+                        'impressions': _safe_int_conversion(row.iloc[3]),
+                        'impressions_ctr': _safe_float_conversion(row.iloc[4]),
+                        'csv_views': _safe_int_conversion(row.iloc[5]),
+                        'average_view_duration': str(row.iloc[6]) if pd.notna(row.iloc[6]) and row.iloc[6] else "0:00",
+                        'watch_time_hours': _safe_float_conversion(row.iloc[7])
+                    }
+        except (IndexError, ValueError, TypeError) as e:
+            errors_count += 1
+            if errors_count <= 5:  # Only show first 5 errors to avoid spam
+                st.warning(f"Skipping row {idx}: {str(e)}")
+            continue
+    
+    if errors_count > 5:
+        st.warning(f"Skipped {errors_count - 5} additional rows with errors")
+    
+    return video_ids, csv_data
+
+
+def _safe_int_conversion(value: Any) -> int:
+    """Safely convert value to integer."""
+    try:
+        return int(float(value)) if pd.notna(value) and value else 0
+    except (ValueError, TypeError):
+        return 0
+
+
+def _safe_float_conversion(value: Any) -> float:
+    """Safely convert value to float."""
+    try:
+        return float(value) if pd.notna(value) and value else 0.0
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def combine_csv_and_api_data(video_ids: List[str], csv_data: Dict[str, Dict[str, Any]], 
+                            video_data: Dict[str, Dict], analyzer: YouTubeAnalyzer) -> List[Dict[str, Any]]:
+    """Combine CSV data with YouTube API data."""
+    combined_data = []
+    
+    for video_id in video_ids:
+        if video_id in csv_data:
+            csv_row = csv_data[video_id]
+            
+            if video_id in video_data:
+                api_data = video_data[video_id]
+                category = analyzer.categorize_by_date(api_data['published_at'])
+                
+                combined_video = {
+                    **csv_row,
+                    'title': api_data.get('title', 'Unknown Title'),
+                    'published_at': api_data.get('published_at', ''),
+                    'api_views': api_data.get('view_count', 0),
+                    'thumbnail_url': api_data.get('thumbnail_url', ''),
+                    'category': category
+                }
+            else:
+                # Video not found in API, use default values
+                combined_video = {
+                    **csv_row,
+                    'title': f'Video ID: {video_id}',
+                    'published_at': '',
+                    'api_views': 0,
+                    'thumbnail_url': '',
+                    'category': 'Unknown'
+                }
+            
+            combined_data.append(combined_video)
+    
+    return combined_data
+
+
+def categorize_videos(combined_data: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    """Categorize videos by time periods."""
+    categories = {
+        "Last 2 weeks": [],
+        "2-4 weeks ago": [],
+        "1-3 months ago": [],
+        "More than 3 months ago": [],
+        "Unknown": []
+    }
+    
+    for video in combined_data:
+        category = video.get('category', 'Unknown')
+        if category in categories:
+            categories[category].append(video)
+        else:
+            categories['Unknown'].append(video)
+    
+    return categories
+
+
+def display_summary(categories: Dict[str, List[Dict[str, Any]]]) -> None:
+    """Display analytics summary."""
+    st.header("📈 Analytics Summary")
+    
+    # Filter out empty categories for metrics
+    non_empty_categories = [(name, videos) for name, videos in categories.items() if videos]
+    
+    if non_empty_categories:
+        # Create columns based on non-empty categories
+        summary_cols = st.columns(min(len(non_empty_categories), 5))
+        
+        for idx, (category_name, videos) in enumerate(non_empty_categories[:5]):
+            with summary_cols[idx]:
+                # Shorten category names for display
+                display_name = category_name.replace(" ago", "").replace("More than ", "3+ ")
+                st.metric(display_name, len(videos))
+
+
+def display_video_analysis(categories: Dict[str, List[Dict[str, Any]]]) -> None:
+    """Display video analysis by time periods."""
+    st.header("📺 Video Analysis by Time Periods")
+    
+    # Check if there are any videos to display
+    has_videos = any(len(videos) > 0 for videos in categories.values())
+    
+    if has_videos:
+        for category_name, videos in categories.items():
+            if videos:  # Only show categories with videos
+                display_video_table(videos, category_name)
+    else:
+        st.warning("No videos found to analyze. Please check your CSV file format.")
+
+
+def process_uploaded_file(uploaded_file, api_key: str) -> None:
+    """Process uploaded CSV file and display analysis with enhanced UX."""
+    try:
+        # Read CSV file with better encoding handling
+        try:
+            df = pd.read_csv(uploaded_file, encoding='utf-8')
+        except UnicodeDecodeError:
+            df = pd.read_csv(uploaded_file, encoding='latin-1')
+        
+        # Display file info with more details
+        st.success(f"✅ File uploaded successfully!")
+        
+        # Show file information in an expander
+        with st.expander("📋 File Details", expanded=False):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Rows", len(df))
+            with col2:
+                st.metric("Columns", len(df.columns))
+            with col3:
+                st.metric("File Size", f"{uploaded_file.size / 1024:.1f} KB")
+        
+        # Validate CSV structure
+        is_valid, error_msg = validate_csv_structure(df)
+        if not is_valid:
+            st.error(f"❌ {error_msg}")
+            st.error("Please ensure you're uploading a valid YouTube Analytics export file.")
+            
+            # Show expected format help
+            with st.expander("ℹ️ Expected CSV Format"):
+                st.markdown("""
+                Your CSV should have:
+                - At least 3 rows (header, totals, data)
+                - At least 8 columns
+                - Traffic source in first column (format: YT_RELATED.{video_id})
+                - Impressions, CTR, Views, Duration, Watch Time in subsequent columns
+                """)
+            return
+        
+        # Skip header and total rows (first 2 rows)
+        data_df = df.iloc[2:].copy()
+        
+        # Enhanced progress tracking
+        progress_container = st.container()
+        with progress_container:
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            # Extract video IDs
+            status_text.text("🔍 Extracting video IDs...")
+            
+            try:
+                analyzer = YouTubeAnalyzer(api_key)
+            except ValueError as e:
+                st.error(f"❌ API Key Error: {str(e)}")
+                return
+            
+            video_ids, csv_data = extract_video_data_from_csv(data_df, analyzer)
+            
+            progress_bar.progress(25)
+            status_text.text(f"🎥 Found {len(video_ids)} unique videos. Fetching data from YouTube API...")
+            
+            if not video_ids:
+                st.error("❌ No valid YouTube video IDs found in the CSV file.")
+                st.info("💡 Make sure your CSV contains traffic source data in YT_RELATED.{video_id} format")
+                return
+            
+            # Show API fetch progress
+            if len(video_ids) > 50:
+                batches = (len(video_ids) + 49) // 50
+                status_text.text(f"📡 Fetching data in {batches} batch(es) from YouTube API...")
+            
+            # Fetch video data from YouTube API
+            video_data = analyzer.get_video_data(video_ids)
+            progress_bar.progress(75)
+            
+            # Combine CSV data with API data
+            status_text.text("⚙️ Processing and categorizing videos...")
+            combined_data = combine_csv_and_api_data(video_ids, csv_data, video_data, analyzer)
+            
+            progress_bar.progress(100)
+            status_text.text("✅ Processing complete!")
+            time.sleep(0.5)  # Reduced sleep time for better UX
+            
+        # Clear progress indicators
+        progress_container.empty()
+        
+        # Show processing results
+        total_processed = len(combined_data)
+        api_matched = sum(1 for v in combined_data if v.get('api_views', 0) > 0)
+        
+        with st.expander("📊 Processing Summary", expanded=False):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Videos Processed", total_processed)
+            with col2:
+                st.metric("API Data Found", api_matched)
+            with col3:
+                match_rate = (api_matched / total_processed * 100) if total_processed > 0 else 0
+                st.metric("Match Rate", f"{match_rate:.1f}%")
+        
+        # Categorize videos by time periods
+        categories = categorize_videos(combined_data)
+        
+        # Display results
+        display_summary(categories)
+        st.markdown("---")
+        display_video_analysis(categories)
+        
+        # Add download option for processed data
+        if st.button("💾 Download Processed Data as CSV"):
+            processed_df = _create_download_dataframe(combined_data)
+            csv_data = processed_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv_data,
+                file_name="youtube_analytics_processed.csv",
+                mime="text/csv"
+            )
+        
+    except pd.errors.EmptyDataError:
+        st.error("❌ The uploaded file appears to be empty.")
+    except pd.errors.ParserError as e:
+        st.error(f"❌ Error parsing CSV file: {str(e)}")
+        st.error("Please check that your file is a valid CSV format.")
+    except Exception as e:
+        st.error(f"❌ Unexpected error processing file: {str(e)}")
+        st.error("Please try again or contact support if the issue persists.")
+
+
+def _create_download_dataframe(combined_data: List[Dict[str, Any]]) -> pd.DataFrame:
+    """Create a downloadable dataframe from processed video data."""
+    rows = []
+    for video in combined_data:
+        rows.append({
+            'Video ID': video.get('video_id', ''),
+            'Title': video.get('title', ''),
+            'Published Date': video.get('published_at', ''),
+            'Category': video.get('category', ''),
+            'CSV Views': video.get('csv_views', 0),
+            'API Views': video.get('api_views', 0),
+            'Impressions': video.get('impressions', 0),
+            'CTR (%)': video.get('impressions_ctr', 0),
+            'Avg View Duration': video.get('average_view_duration', ''),
+            'Watch Time (hrs)': video.get('watch_time_hours', 0),
+            'Video URL': f"https://www.youtube.com/watch?v={video.get('video_id', '')}"
+        })
+    return pd.DataFrame(rows)
+
+
+def main():
+    """Main application function."""
+    # Add container for centered content
+    st.title("📊 YouTube Analytics Dashboard")
+    st.markdown("<p style='text-align: center; color: #666; margin-bottom: 2rem;'>Upload your YouTube analytics CSV file and analyze video performance by time periods</p>", unsafe_allow_html=True)
+    
+    # Setup sidebar and get API key
+    api_key = setup_sidebar()
+    if not api_key:
+        st.stop()
     
     # File upload
     st.header("📁 Upload CSV File")
@@ -51,158 +375,7 @@ def main():
     )
     
     if uploaded_file is not None:
-        try:
-            # Read CSV file
-            df = pd.read_csv(uploaded_file)
-            
-            # Display file info
-            st.success(f"✅ File uploaded successfully! Found {len(df)} rows.")
-            
-            # Skip header and total rows (first 2 rows)
-            data_df = df.iloc[2:].copy()
-            
-            if len(data_df) == 0:
-                st.error("No data rows found in the CSV file.")
-                st.stop()
-                
-            # Validate CSV structure
-            if len(data_df.columns) < 8:
-                st.error(f"CSV file has insufficient columns. Expected at least 8, found {len(data_df.columns)}")
-                st.error("Please ensure you're uploading a valid YouTube Analytics export file.")
-                st.stop()
-            
-            # Show processing status
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            # Extract video IDs
-            status_text.text("Extracting video IDs...")
-            analyzer = YouTubeAnalyzer(api_key)
-            
-            video_ids = []
-            csv_data = {}
-            
-            for idx, row in data_df.iterrows():
-                try:
-                    traffic_source = str(row.iloc[0])  # First column
-                    video_id = analyzer.extract_video_id(traffic_source)
-                    
-                    if video_id:
-                        video_ids.append(video_id)
-                        csv_data[video_id] = {
-                            'video_id': video_id,
-                            'impressions': int(row.iloc[3]) if pd.notna(row.iloc[3]) and row.iloc[3] else 0,
-                            'impressions_ctr': float(row.iloc[4]) if pd.notna(row.iloc[4]) and row.iloc[4] else 0.0,
-                            'csv_views': int(row.iloc[5]) if pd.notna(row.iloc[5]) and row.iloc[5] else 0,
-                            'average_view_duration': str(row.iloc[6]) if pd.notna(row.iloc[6]) and row.iloc[6] else "0:00",
-                            'watch_time_hours': float(row.iloc[7]) if pd.notna(row.iloc[7]) and row.iloc[7] else 0.0
-                        }
-                except (IndexError, ValueError, TypeError) as e:
-                    st.warning(f"Skipping row {idx}: {str(e)}")
-                    continue
-            
-            progress_bar.progress(25)
-            status_text.text(f"Found {len(video_ids)} videos. Fetching data from YouTube API...")
-            
-            if not video_ids:
-                st.error("No valid YouTube video IDs found in the CSV file.")
-                st.stop()
-            
-            # Fetch video data from YouTube API
-            video_data = analyzer.get_video_data(video_ids)
-            progress_bar.progress(75)
-            
-            # Combine CSV data with API data
-            status_text.text("Processing and categorizing videos...")
-            combined_data = []
-            
-            for video_id in video_ids:
-                if video_id in csv_data:
-                    csv_row = csv_data[video_id]
-                    
-                    # Check if we have API data for this video
-                    if video_id in video_data:
-                        api_data = video_data[video_id]
-                        category = analyzer.categorize_by_date(api_data['published_at'])
-                        
-                        combined_video = {
-                            **csv_row,
-                            'title': api_data.get('title', 'Unknown Title'),
-                            'published_at': api_data.get('published_at', ''),
-                            'api_views': api_data.get('view_count', 0),
-                            'thumbnail_url': api_data.get('thumbnail_url', ''),
-                            'category': category
-                        }
-                    else:
-                        # Video not found in API, use default values
-                        combined_video = {
-                            **csv_row,
-                            'title': f'Video ID: {video_id}',
-                            'published_at': '',
-                            'api_views': 0,
-                            'thumbnail_url': '',
-                            'category': 'Unknown'
-                        }
-                    
-                    combined_data.append(combined_video)
-            
-            progress_bar.progress(100)
-            status_text.text("✅ Processing complete!")
-            time.sleep(1)
-            progress_bar.empty()
-            status_text.empty()
-            
-            # Categorize videos by time periods
-            categories = {
-                "Last 2 weeks": [],
-                "2-4 weeks ago": [],
-                "1-3 months ago": [],
-                "More than 3 months ago": [],
-                "Unknown": []  # Add Unknown category
-            }
-            
-            for video in combined_data:
-                category = video.get('category', 'Unknown')
-                if category in categories:
-                    categories[category].append(video)
-                else:
-                    # Fallback to Unknown if category is not recognized
-                    categories['Unknown'].append(video)
-            
-            # Display summary
-            st.header("📈 Analytics Summary")
-            
-            # Filter out empty categories for metrics
-            non_empty_categories = [(name, videos) for name, videos in categories.items() if videos]
-            
-            if non_empty_categories:
-                # Create columns based on non-empty categories
-                summary_cols = st.columns(min(len(non_empty_categories), 5))  # Max 5 columns
-                
-                for idx, (category_name, videos) in enumerate(non_empty_categories[:5]):
-                    with summary_cols[idx]:
-                        # Shorten category names for display
-                        display_name = category_name.replace(" ago", "").replace("More than ", "3+ ")
-                        st.metric(display_name, len(videos))
-            
-            st.markdown("---")
-            
-            # Display videos by category
-            st.header("📺 Video Analysis by Time Periods")
-            
-            # Check if there are any videos to display
-            has_videos = any(len(videos) > 0 for videos in categories.values())
-            
-            if has_videos:
-                for category_name, videos in categories.items():
-                    if videos:  # Only show categories with videos
-                        display_video_table(videos, category_name)
-            else:
-                st.warning("No videos found to analyze. Please check your CSV file format.")
-            
-        except Exception as e:
-            st.error(f"Error processing file: {str(e)}")
-            st.error("Please make sure your CSV file has the correct format.")
+        process_uploaded_file(uploaded_file, api_key)
 
 if __name__ == "__main__":
     main()
