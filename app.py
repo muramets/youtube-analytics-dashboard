@@ -357,7 +357,7 @@ def main():
         """
         <style>
             .block-container {
-                max-width: 1150px !important;
+                max-width: 950px !important;
                 padding: 2rem 1.5rem 2.5rem !important;
                 margin: 0 auto !important;
             }

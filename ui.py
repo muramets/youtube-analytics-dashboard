@@ -164,10 +164,15 @@ def display_video_table(
     df["Views"] = df["Views"].apply(_format_views_column)
     df["Impressions"] = df["Impressions"].apply(_format_impressions_column)
 
+    visible_rows = min(len(df), 10)
+    base_height = 70  # header + padding
+    row_height = 38
+    table_height = base_height + visible_rows * row_height
+
     st.dataframe(
         df,
         use_container_width=True,
-        height=400,
+        height=table_height,
         hide_index=True,
         column_config={
             "Video Title": st.column_config.TextColumn(
