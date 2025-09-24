@@ -347,51 +347,61 @@ def _create_download_dataframe(combined_data: List[Dict[str, Any]]) -> pd.DataFr
 
 def main():
     """Main application function."""
-    # Create centered container for the entire app
-    with st.container():
-        # Center content with CSS
-        st.markdown("""
-        <style>
-        .main > div {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem 1rem;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        
-        st.title("📊 YouTube Analytics Dashboard")
-        st.markdown("<p style='text-align: center; color: #666; margin-bottom: 2rem;'>Upload your YouTube analytics CSV file and analyze video performance by time periods</p>", unsafe_allow_html=True)
-        
-        # Setup sidebar and get API key
-        api_key = setup_sidebar()
-        
-        if not api_key:
-            # Show message about needing API key before CSV upload
-            st.info("👆 Please enter your YouTube API key in the sidebar to continue")
-            st.markdown("---")
-            with st.expander("ℹ️ How to get YouTube API Key"):
-                st.markdown("""
-                1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-                2. Create a new project or select existing one
-                3. Enable **YouTube Data API v3**
-                4. Create credentials (API Key)
-                5. Copy the API key and paste it in the sidebar
-                """)
-            st.stop()
-        
-        # File upload section (only shown after API key validation)
-        st.header("📁 Upload CSV File")
-        st.markdown("✅ API key validated - you can now upload your CSV file")
-        
-        uploaded_file = st.file_uploader(
-            "Choose your YouTube analytics CSV file",
-            type="csv",
-            help="Upload the CSV file exported from YouTube Analytics"
-        )
-        
-        if uploaded_file is not None:
-            process_uploaded_file(uploaded_file, api_key)
+    # Apply centering CSS first, before any content
+    st.markdown("""
+    <style>
+    .main .block-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+    
+    /* Ensure sidebar doesn't affect centering */
+    .main {
+        padding: 0;
+    }
+    
+    /* Center the main content area */
+    section.main > div {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.title("📊 YouTube Analytics Dashboard")
+    st.markdown("<p style='text-align: center; color: #666; margin-bottom: 2rem;'>Upload your YouTube analytics CSV file and analyze video performance by time periods</p>", unsafe_allow_html=True)
+    
+    # Setup sidebar and get API key
+    api_key = setup_sidebar()
+    
+    if not api_key:
+        # Show message about needing API key before CSV upload
+        st.info("👆 Please enter your YouTube API key in the sidebar to continue")
+        st.markdown("---")
+        with st.expander("ℹ️ How to get YouTube API Key"):
+            st.markdown("""
+            1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+            2. Create a new project or select existing one
+            3. Enable **YouTube Data API v3**
+            4. Create credentials (API Key)
+            5. Copy the API key and paste it in the sidebar
+            """)
+        st.stop()
+    
+    # File upload section (only shown after API key validation)
+    st.header("📁 Upload CSV File")
+    st.markdown("✅ API key validated - you can now upload your CSV file")
+    
+    uploaded_file = st.file_uploader(
+        "Choose your YouTube analytics CSV file",
+        type="csv",
+        help="Upload the CSV file exported from YouTube Analytics"
+    )
+    
+    if uploaded_file is not None:
+        process_uploaded_file(uploaded_file, api_key)
 
 if __name__ == "__main__":
     main()

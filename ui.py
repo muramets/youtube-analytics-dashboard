@@ -15,8 +15,11 @@ def inject_base_css() -> None:
     st.markdown(
         """
 <style>
-    /* Streamlit dataframe container full width, but capped height for scroll */
-    .stDataFrame { width: 100%; }
+    /* Ensure dataframes stay within centered container */
+    .stDataFrame { 
+        width: 100%; 
+        max-width: 100%;
+    }
 
     /* Header chip for time periods */
     .time-period-header {
@@ -43,6 +46,12 @@ def inject_base_css() -> None:
     /* Headings */
     h1 { text-align: center; margin-bottom: 0.5rem; }
     h2 { margin-top: 1.5rem; margin-bottom: 0.5rem; }
+    
+    /* Ensure all content respects the centered layout */
+    .main .block-container {
+        max-width: 1200px !important;
+        padding: 2rem 1rem !important;
+    }
 </style>
         """,
         unsafe_allow_html=True,
