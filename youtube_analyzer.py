@@ -203,10 +203,30 @@ class YouTubeAnalyzer:
             return None
 
     @staticmethod
-    def _normalize_text(text: str) -> List[str]:
+    def _normalize_text(text: str, filter_stopwords: bool = True) -> List[str]:
+        """Normalize text and optionally filter out common stop words."""
         if not text:
             return []
+        
+        # Extract words (alphanumeric)
         words = re.findall(r"[a-zA-Z0-9]+", text.lower())
+        
+        if filter_stopwords:
+            # Common English stop words to filter out
+            stop_words = {
+                'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
+                'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the',
+                'to', 'was', 'will', 'with', 'the', 'this', 'these', 'they',
+                'them', 'then', 'there', 'their', 'what', 'when', 'where', 'who',
+                'which', 'why', 'how', 'all', 'would', 'she', 'her', 'him', 'his',
+                'can', 'could', 'should', 'may', 'might', 'must', 'shall', 'will',
+                'would', 'do', 'does', 'did', 'have', 'had', 'has', 'having',
+                'am', 'is', 'are', 'was', 'were', 'been', 'being', 'i', 'you',
+                'we', 'they', 'me', 'us', 'my', 'your', 'our', 'if', 'or', 'but',
+                'not', 'no', 'nor', 'so', 'than', 'too', 'very', 's', 't'
+            }
+            words = [w for w in words if w not in stop_words and len(w) > 1]
+        
         return words
 
     def compare_source_with_video(self, source_meta: Dict[str, Union[str, List[str]]],
@@ -222,17 +242,23 @@ class YouTubeAnalyzer:
         if not source_meta:
             return result
 
-        source_title_words = set(self._normalize_text(source_meta.get("title", "")))
-        source_description_words = set(self._normalize_text(source_meta.get("description", "")))
+        # Use filtered words for title and description comparisons
+        source_title_words = set(self._normalize_text(source_meta.get("title", ""), filter_stopwords=True))
+        source_description_words = set(self._normalize_text(source_meta.get("description", ""), filter_stopwords=True))
         source_tags = set([tag.lower() for tag in source_meta.get("tags", [])])
 
         # API data might include title/description, otherwise use csv title
-        video_title_words = set(self._normalize_text(video_data.get("title", "")))
-        video_description_words = set(self._normalize_text(video_data.get("description", "")))
+        video_title_words = set(self._normalize_text(video_data.get("title", ""), filter_stopwords=True))
+        video_description_words = set(self._normalize_text(video_data.get("description", ""), filter_stopwords=True))
         video_tags = set([tag.lower() for tag in video_data.get("tags", [])])
 
-        result["common_title_words"] = ", ".join(sorted(source_title_words & video_title_words))
-        result["common_description_words"] = ", ".join(sorted(source_description_words & video_description_words))
+        # Find common meaningful words
+        common_title = source_title_words & video_title_words
+        common_description = source_description_words & video_description_words
+        
+        # Sort by word length (longer words first) then alphabetically for better readability
+        result["common_title_words"] = ", ".join(sorted(common_title, key=lambda x: (-len(x), x))[:10])  # Limit to 10 most relevant
+        result["common_description_words"] = ", ".join(sorted(common_description, key=lambda x: (-len(x), x))[:15])  # Limit to 15 most relevant
         result["common_tags"] = ", ".join(sorted(source_tags & video_tags))
         result["different_tags"] = ", ".join(sorted(video_tags - source_tags))
 
