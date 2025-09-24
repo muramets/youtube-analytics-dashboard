@@ -210,12 +210,12 @@ def display_video_table(
                 help="Click on the URL column to open the video"
             ),
             "Views": st.column_config.TextColumn("Views", width="small", help="Total views"),
-            "Published Date": st.column_config.TextColumn("Published\nDate", width="small", help="Video publish date"),
-            "Avg View Duration": st.column_config.TextColumn("Avg View\nDuration", width="small"),
+            "Published Date": st.column_config.TextColumn("Published Date", width="small", help="Video publish date"),
+            "Avg View Duration": st.column_config.TextColumn("Avg View Duration", width="small"),
             "Impressions": st.column_config.TextColumn("Impressions", width="small"),
-            "CTR (%)": st.column_config.TextColumn("CTR\n(%)", width="small"),
+            "CTR (%)": st.column_config.TextColumn("CTR (%)", width="small"),
             "Watch Time (hrs)": st.column_config.NumberColumn(
-                "Watch Time\n(hrs)", 
+                "Watch Time (hrs)", 
                 width="small", 
                 format="%.1f"
             ),
