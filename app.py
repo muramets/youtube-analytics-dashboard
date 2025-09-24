@@ -228,6 +228,26 @@ def process_uploaded_files(uploaded_files: List, api_key: str, source_video_url:
     source_metadata: Optional[Dict[str, Union[str, List[str]]]] = None
 
     try:
+        # Initialize analyzer first
+        try:
+            analyzer = YouTubeAnalyzer(api_key)
+        except ValueError as e:
+            st.error(f"❌ API Key Error: {str(e)}")
+            return
+        
+        # Fetch source metadata if URL provided
+        if source_video_url:
+            source_video_id = analyzer.extract_video_id_from_url(source_video_url)
+            if source_video_id:
+                st.info(f"🔍 Using source video ID: {source_video_id}")
+                source_metadata = analyzer.fetch_source_video_metadata(source_video_id)
+                if source_metadata:
+                    st.success(f"✅ Source video '{source_metadata.get('title', 'Unknown')}' metadata fetched.")
+                else:
+                    st.warning("⚠️ Could not fetch metadata for source video. Check URL or API key.")
+            else:
+                st.warning("⚠️ Could not extract video ID from the provided URL.")
+        
         progress_container = st.container()
         with progress_container:
             progress_bar = st.progress(0)
@@ -248,15 +268,6 @@ def process_uploaded_files(uploaded_files: List, api_key: str, source_video_url:
                     st.error(f"❌ {uploaded_file.name}: {error_msg}")
                     st.error("Please ensure you're uploading a valid YouTube Analytics export file.")
                     continue
-
-                if analyzer is None:
-                    try:
-                        analyzer = YouTubeAnalyzer(api_key)
-                        if source_video_url:
-                            source_metadata = analyzer.fetch_source_video_metadata(source_video_url)
-                    except ValueError as e:
-                        st.error(f"❌ API Key Error: {str(e)}")
-                        return
 
                 video_ids, csv_data = extract_video_data_from_csv(df, analyzer)
 

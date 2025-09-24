@@ -109,7 +109,7 @@ def display_video_table(
             video_id = video.get('video_id', '')
             video_url = f"https://www.youtube.com/watch?v={video_id}" if video_id else ""
 
-            df_rows.append({
+            row_data = {
                 "Video Title": video.get("title", "Unknown"),
                 "Views": views_value,
                 "Published Date": format_date(video.get("published_at", "")),
@@ -119,7 +119,19 @@ def display_video_table(
                 "Watch Time (hrs)": watch_time,
                 "Video URL": video_url,
                 "Type": video.get("content_type", "Unknown"),
-            })
+            }
+            
+            # Add comparison columns if they exist
+            if "common_title_words" in video:
+                row_data["Common Title Words"] = video.get("common_title_words", "")
+            if "common_description_words" in video:
+                row_data["Common Description Words"] = video.get("common_description_words", "")
+            if "common_tags" in video:
+                row_data["Common Tags"] = video.get("common_tags", "")
+            if "different_tags" in video:
+                row_data["Different Tags"] = video.get("different_tags", "")
+            
+            df_rows.append(row_data)
 
         except Exception as e:
             logger.warning(f"Error processing video data: {str(e)}")
@@ -153,6 +165,19 @@ def display_video_table(
         "Video URL",
         "Type",
     ]
+    
+    # Add comparison columns if they exist in the DataFrame
+    source_columns = [
+        "Common Title Words",
+        "Common Description Words",
+        "Common Tags",
+        "Different Tags",
+    ]
+    
+    for col in source_columns:
+        if col in df.columns:
+            desired_columns.append(col)
+    
     df = df[desired_columns]
     
     # Sort by Views (handle potential string/numeric mix)
