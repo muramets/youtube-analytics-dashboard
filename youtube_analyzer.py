@@ -1,6 +1,7 @@
 import time
 import logging
 import re
+from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Any
 
@@ -37,6 +38,39 @@ class YouTubeAnalyzer:
             # Basic validation for YouTube video ID format (11 characters, alphanumeric, hyphen, underscore)
             if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
                 return video_id
+        return None
+
+    @staticmethod
+    def extract_video_id_from_url(url: str) -> Optional[str]:
+        """Extract a YouTube video ID from various URL formats."""
+        if not url:
+            return None
+
+        # Direct 11-char ID
+        if re.fullmatch(r"[A-Za-z0-9_-]{11}", url):
+            return url
+
+        parsed = urlparse(url)
+        if parsed.netloc in {"youtu.be"}:
+            vid = parsed.path.lstrip("/")
+            if re.fullmatch(r"[A-Za-z0-9_-]{11}", vid):
+                return vid
+
+        if parsed.query:
+            query = parse_qs(parsed.query)
+            vid_list = query.get("v")
+            if vid_list:
+                vid = vid_list[0]
+                if re.fullmatch(r"[A-Za-z0-9_-]{11}", vid):
+                    return vid
+
+        if parsed.path:
+            # Possible /embed/{id}
+            segments = parsed.path.split("/")
+            for segment in segments[::-1]:
+                if re.fullmatch(r"[A-Za-z0-9_-]{11}", segment):
+                    return segment
+
         return None
 
     @st.cache_data(ttl=3600)  # Cache for 1 hour
@@ -132,8 +166,8 @@ class YouTubeAnalyzer:
         if not video_url:
             return None
 
-        video_id = video_url.split("v=")[-1]
-        if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+        video_id = self.extract_video_id_from_url(video_url)
+        if not video_id:
             return None
 
         if video_id in self.source_video_cache:
