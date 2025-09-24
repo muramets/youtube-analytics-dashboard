@@ -39,15 +39,15 @@ class YouTubeAnalyzer:
         return None
 
     @st.cache_data(ttl=3600)  # Cache for 1 hour
-    def get_video_data(_self, video_ids: List[str]) -> tuple[Dict[str, Dict], str]:
+    def get_video_data(_self, video_ids: List[str]) -> tuple[Dict[str, Dict], float]:
         """Fetch video data from YouTube API in batches with caching."""
         if not video_ids:
-            return {}, ""
+            return {}, 0.0
 
         video_data: Dict[str, Dict] = {}
         failed_batches = 0
         max_retries = 3
-        marker = str(time.time())
+        marker = time.time()
 
         for i in range(0, len(video_ids), 50):
             batch_ids = video_ids[i:i + 50]

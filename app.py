@@ -289,7 +289,7 @@ def process_uploaded_files(uploaded_files: List, api_key: str) -> None:
         display_video_analysis(categories)
 
         if cache_marker:
-            st.caption(f"Cache marker: {cache_marker}")
+            st.info("♻️ Cached API data reused (valid up to 1 hour)")
 
         if st.button("💾 Download Combined Data as CSV"):
             processed_df = _create_download_dataframe(all_combined_data)
@@ -391,10 +391,15 @@ def main():
 
     if "upload_slot_count" not in st.session_state:
         st.session_state.upload_slot_count = 1
+    if "upload_removed" not in st.session_state:
+        st.session_state.upload_removed = set()
 
     uploaded_files: List = []
 
     for slot_index in range(st.session_state.upload_slot_count):
+        if slot_index in st.session_state.upload_removed:
+            continue
+
         uploaded = st.file_uploader(
             f"CSV file #{slot_index + 1}",
             type="csv",
@@ -403,6 +408,12 @@ def main():
         )
         if uploaded is not None:
             uploaded_files.append(uploaded)
+
+        if slot_index > 0:
+            remove_key = f"remove_uploader_{slot_index}"
+            if st.button("❌ Remove", key=remove_key):
+                st.session_state.upload_removed.add(slot_index)
+                st.rerun()
 
     if st.button("➕ Add another CSV", use_container_width=True):
         st.session_state.upload_slot_count += 1
