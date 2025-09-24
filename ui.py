@@ -44,13 +44,26 @@ def inject_base_css() -> None:
     }
 
     /* Table header styling */
-    div[data-testid="stDataFrame"] table thead tr th {
+    div[data-testid="stDataFrame"] table thead th {
         text-align: center !important;
         white-space: normal !important;
     }
 
-    div[data-testid="stDataFrame"] table thead tr th div {
+    div[data-testid="stDataFrame"] table thead th div[data-testid="columnHeaderCell"] {
+        display: flex !important;
         justify-content: center !important;
+    }
+
+    div[data-testid="stDataFrame"] table thead th div[data-testid="columnHeaderText"] {
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        text-align: center !important;
+        line-height: 1.2 !important;
+    }
+
+    div[data-testid="stDataFrame"] table thead th div[data-testid="columnHeaderText"] span {
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
     }
 
     /* Headings */
