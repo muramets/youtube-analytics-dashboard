@@ -52,6 +52,9 @@ def inject_base_css() -> None:
     div[data-testid="stDataFrame"] table thead th div[data-testid="columnHeaderCell"] {
         display: flex !important;
         justify-content: center !important;
+        align-items: center !important;
+        height: auto !important;
+        padding: 6px 8px !important;
     }
 
     div[data-testid="stDataFrame"] table thead th div[data-testid="columnHeaderText"] {
@@ -59,6 +62,9 @@ def inject_base_css() -> None:
         overflow-wrap: anywhere !important;
         text-align: center !important;
         line-height: 1.2 !important;
+        display: block !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
     }
 
     div[data-testid="stDataFrame"] table thead th div[data-testid="columnHeaderText"] span {
