@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import time
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 
 from youtube_analyzer import YouTubeAnalyzer
 from ui import inject_base_css, display_video_table
@@ -116,7 +116,8 @@ def _safe_float_conversion(value: Any) -> float:
 
 
 def combine_csv_and_api_data(video_ids: List[str], csv_data: Dict[str, Dict[str, Any]], 
-                            video_data: Dict[str, Dict], analyzer: YouTubeAnalyzer) -> List[Dict[str, Any]]:
+                            video_data: Dict[str, Dict], analyzer: YouTubeAnalyzer,
+                            source_metadata: Optional[Dict[str, Union[str, List[str]]]] = None) -> List[Dict[str, Any]]:
     """Combine CSV data with YouTube API data."""
     combined_data = []
     
@@ -127,7 +128,8 @@ def combine_csv_and_api_data(video_ids: List[str], csv_data: Dict[str, Dict[str,
             if video_id in video_data:
                 api_data = video_data[video_id]
                 category = analyzer.categorize_by_date(api_data['published_at'])
-                
+                overlap_metrics = analyzer.compare_source_with_video(source_metadata, api_data) if source_metadata else {}
+
                 combined_video = {
                     **csv_row,
                     'title': api_data.get('title', 'Unknown Title'),
@@ -135,10 +137,13 @@ def combine_csv_and_api_data(video_ids: List[str], csv_data: Dict[str, Dict[str,
                     'api_views': api_data.get('view_count', 0),
                     'thumbnail_url': api_data.get('thumbnail_url', ''),
                     'category': category,
-                    'content_type': api_data.get('content_type', 'Unknown')
+                    'content_type': api_data.get('content_type', 'Unknown'),
+                    **overlap_metrics
                 }
             else:
                 # Video not found in API, use default values
+                overlap_metrics = analyzer.compare_source_with_video(source_metadata, {}) if source_metadata else {}
+
                 combined_video = {
                     **csv_row,
                     'title': f'Video ID: {video_id}',
@@ -146,7 +151,8 @@ def combine_csv_and_api_data(video_ids: List[str], csv_data: Dict[str, Dict[str,
                     'api_views': 0,
                     'thumbnail_url': '',
                     'category': 'Unknown',
-                    'content_type': 'Unknown'
+                    'content_type': 'Unknown',
+                    **overlap_metrics
                 }
             
             combined_data.append(combined_video)
@@ -212,13 +218,14 @@ def display_video_analysis(categories: Dict[str, List[Dict[str, Any]]]) -> None:
         st.warning("No videos found to analyze. Please check your CSV file format.")
 
 
-def process_uploaded_files(uploaded_files: List, api_key: str) -> None:
+def process_uploaded_files(uploaded_files: List, api_key: str, source_video_url: str) -> None:
     """Process multiple uploaded CSV files and display combined analysis."""
     total_rows = 0
     all_combined_data: List[Dict[str, Any]] = []
     api_fetch_count = 0
     cache_fetch_count = 0
     analyzer: Optional[YouTubeAnalyzer] = None
+    source_metadata: Optional[Dict[str, Union[str, List[str]]]] = None
 
     try:
         progress_container = st.container()
@@ -245,6 +252,8 @@ def process_uploaded_files(uploaded_files: List, api_key: str) -> None:
                 if analyzer is None:
                     try:
                         analyzer = YouTubeAnalyzer(api_key)
+                        if source_video_url:
+                            source_metadata = analyzer.fetch_source_video_metadata(source_video_url)
                     except ValueError as e:
                         st.error(f"❌ API Key Error: {str(e)}")
                         return
@@ -258,7 +267,7 @@ def process_uploaded_files(uploaded_files: List, api_key: str) -> None:
                 status_text.text(f"📡 Fetching API data for {len(video_ids)} videos in {uploaded_file.name}...")
                 video_data, marker = analyzer.get_video_data(video_ids)
 
-                combined_data = combine_csv_and_api_data(video_ids, csv_data, video_data, analyzer)
+                combined_data = combine_csv_and_api_data(video_ids, csv_data, video_data, analyzer, source_metadata)
                 all_combined_data.extend(combined_data)
 
                 if marker:
@@ -392,6 +401,12 @@ def main():
         st.info("👆 Please enter your YouTube API key in the sidebar to continue")
         st.stop()
 
+    source_video_url = st.text_input(
+        "Source video URL",
+        placeholder="https://www.youtube.com/watch?v=...",
+        help="Optional: provide a reference video to compare titles, descriptions, and tags",
+    )
+
     # File upload section (only shown after API key validation)
     st.header("📁 Upload CSV File")
     st.markdown("✅ API key validated - you can now upload your CSV file")
@@ -427,7 +442,7 @@ def main():
         st.rerun()
 
     if uploaded_files:
-        process_uploaded_files(uploaded_files, api_key)
+        process_uploaded_files(uploaded_files, api_key, source_video_url)
 
 if __name__ == "__main__":
     main()

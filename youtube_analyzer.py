@@ -2,7 +2,7 @@ import time
 import logging
 import re
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 
 import requests
 import streamlit as st
@@ -25,6 +25,7 @@ class YouTubeAnalyzer:
         self.session.headers.update({
             'User-Agent': 'YouTube-Analytics-Dashboard/1.0'
         })
+        self.source_video_cache: Dict[str, Dict[str, Union[str, List[str]]]] = {}
 
     def extract_video_id(self, traffic_source: str) -> Optional[str]:
         """Extract YouTube video ID from YT_RELATED.{video_id} format."""
@@ -84,9 +85,11 @@ class YouTubeAnalyzer:
                         live_details = item.get("liveStreamingDetails")
 
                         is_live = snippet.get("liveBroadcastContent", "none") == "live" or bool(live_details)
- 
+
                         video_data[video_id] = {
                             "title": snippet.get("title", "Unknown Title"),
+                            "description": snippet.get("description", ""),
+                            "tags": snippet.get("tags", []),
                             "published_at": snippet.get("publishedAt", ""),
                             "view_count": int(statistics.get("viewCount", 0)),
                             "thumbnail_url": snippet.get("thumbnails", {}).get("medium", {}).get("url", ""),
@@ -123,6 +126,83 @@ class YouTubeAnalyzer:
             st.warning(f"Failed to fetch data for {failed_batches} batch(es). Some videos may be missing.")
 
         return video_data, marker
+
+    def fetch_source_video_metadata(self, video_url: str) -> Optional[Dict[str, Union[str, List[str]]]]:
+        """Fetch metadata (title, description, tags) for the provided video URL."""
+        if not video_url:
+            return None
+
+        video_id = video_url.split("v=")[-1]
+        if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+            return None
+
+        if video_id in self.source_video_cache:
+            return self.source_video_cache[video_id]
+
+        params = {
+            "part": "snippet",
+            "id": video_id,
+            "key": self.api_key,
+        }
+
+        try:
+            response = self.session.get(self.base_url, params=params, timeout=15)
+            response.raise_for_status()
+            data = response.json()
+
+            items = data.get("items", [])
+            if not items:
+                return None
+
+            snippet = items[0].get("snippet", {})
+            metadata = {
+                "title": snippet.get("title", ""),
+                "description": snippet.get("description", ""),
+                "tags": snippet.get("tags", []),
+            }
+            self.source_video_cache[video_id] = metadata
+            return metadata
+
+        except requests.RequestException as e:
+            logger.error(f"Source video metadata fetch failed: {e}")
+            st.warning("Unable to load source video metadata.")
+            return None
+
+    @staticmethod
+    def _normalize_text(text: str) -> List[str]:
+        if not text:
+            return []
+        words = re.findall(r"[a-zA-Z0-9]+", text.lower())
+        return words
+
+    def compare_source_with_video(self, source_meta: Dict[str, Union[str, List[str]]],
+                                  video_data: Dict[str, Any]) -> Dict[str, str]:
+        """Compute overlap metrics between source metadata and a video's metadata."""
+        result = {
+            "common_title_words": "",
+            "common_description_words": "",
+            "common_tags": "",
+            "different_tags": "",
+        }
+
+        if not source_meta:
+            return result
+
+        source_title_words = set(self._normalize_text(source_meta.get("title", "")))
+        source_description_words = set(self._normalize_text(source_meta.get("description", "")))
+        source_tags = set([tag.lower() for tag in source_meta.get("tags", [])])
+
+        # API data might include title/description, otherwise use csv title
+        video_title_words = set(self._normalize_text(video_data.get("title", "")))
+        video_description_words = set(self._normalize_text(video_data.get("description", "")))
+        video_tags = set([tag.lower() for tag in video_data.get("tags", [])])
+
+        result["common_title_words"] = ", ".join(sorted(source_title_words & video_title_words))
+        result["common_description_words"] = ", ".join(sorted(source_description_words & video_description_words))
+        result["common_tags"] = ", ".join(sorted(source_tags & video_tags))
+        result["different_tags"] = ", ".join(sorted(video_tags - source_tags))
+
+        return result
 
     def categorize_by_date(self, published_date: str) -> str:
         """Categorize videos by publication date with improved error handling."""
