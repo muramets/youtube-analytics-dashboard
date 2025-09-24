@@ -254,7 +254,7 @@ def process_uploaded_files(uploaded_files: List, api_key: str) -> None:
                     continue
 
                 status_text.text(f"📡 Fetching API data for {len(video_ids)} videos in {uploaded_file.name}...")
-                video_data = analyzer.get_video_data(video_ids)
+                video_data, cache_marker = analyzer.get_video_data(video_ids)
 
                 combined_data = combine_csv_and_api_data(video_ids, csv_data, video_data, analyzer)
                 all_combined_data.extend(combined_data)
@@ -287,6 +287,9 @@ def process_uploaded_files(uploaded_files: List, api_key: str) -> None:
         display_summary(categories)
         st.markdown("---")
         display_video_analysis(categories)
+
+        if cache_marker:
+            st.caption(f"Cache marker: {cache_marker}")
 
         if st.button("💾 Download Combined Data as CSV"):
             processed_df = _create_download_dataframe(all_combined_data)
@@ -403,7 +406,7 @@ def main():
 
     if st.button("➕ Add another CSV", use_container_width=True):
         st.session_state.upload_slot_count += 1
-        st.experimental_rerun()
+        st.rerun()
 
     if uploaded_files:
         process_uploaded_files(uploaded_files, api_key)
