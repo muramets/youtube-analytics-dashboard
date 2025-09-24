@@ -215,12 +215,12 @@ def process_uploaded_file(uploaded_file, api_key: str) -> None:
     try:
         # Read CSV file with better encoding handling
         try:
-            df = pd.read_csv(uploaded_file, encoding='utf-8')
+            df = pd.read_csv(uploaded_file, encoding='utf-8', skiprows=1)
         except UnicodeDecodeError:
-            df = pd.read_csv(uploaded_file, encoding='latin-1')
+            df = pd.read_csv(uploaded_file, encoding='latin-1', skiprows=1)
         
         # Display file info
-        st.success(f"✅ File uploaded successfully! Found {len(df)} rows.")
+        st.success(f"✅ File uploaded successfully! Found {len(df) + 1} rows.")
         
         # Validate CSV structure
         is_valid, error_msg = validate_csv_structure(df)
@@ -240,7 +240,7 @@ def process_uploaded_file(uploaded_file, api_key: str) -> None:
             return
         
         # Skip header and total rows (first 2 rows)
-        data_df = df.iloc[2:].copy()
+        data_df = df.copy()
         
         # Enhanced progress tracking
         progress_container = st.container()
@@ -357,7 +357,7 @@ def main():
         """
         <style>
             .block-container {
-                max-width: 950px !important;
+                max-width: 1000px !important;
                 padding: 2rem 1.5rem 2.5rem !important;
                 margin: 0 auto !important;
             }

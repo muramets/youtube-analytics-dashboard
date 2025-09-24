@@ -1,5 +1,6 @@
 import time
 import logging
+import re
 from datetime import datetime
 from typing import Dict, List, Optional, Union
 
@@ -32,8 +33,8 @@ class YouTubeAnalyzer:
             
         if traffic_source.startswith("YT_RELATED."):
             video_id = traffic_source.replace("YT_RELATED.", "")
-            # Basic validation for YouTube video ID format (11 characters)
-            if len(video_id) == 11 and video_id.isalnum():
+            # Basic validation for YouTube video ID format (11 characters, alphanumeric, hyphen, underscore)
+            if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
                 return video_id
         return None
 

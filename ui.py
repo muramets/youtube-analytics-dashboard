@@ -43,6 +43,16 @@ def inject_base_css() -> None:
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
 
+    /* Table header styling */
+    div[data-testid="stDataFrame"] table thead tr th {
+        text-align: center !important;
+        white-space: normal !important;
+    }
+
+    div[data-testid="stDataFrame"] table thead tr th div {
+        justify-content: center !important;
+    }
+
     /* Headings */
     h1 { text-align: center; margin-bottom: 0.5rem; }
     h2 { margin-top: 1.5rem; margin-bottom: 0.5rem; }
@@ -180,8 +190,8 @@ def display_video_table(
                 width="large", 
                 help="Click on the URL column to open the video"
             ),
-            "Views": st.column_config.TextColumn("Views", width="small"),
-            "Published Date": st.column_config.TextColumn("Published Date", width="small"),
+            "Views": st.column_config.TextColumn("Views", width="small", help="Total views"),
+            "Published Date": st.column_config.TextColumn("Published Date", width="small", help="Video publish date"),
             "Avg View Duration": st.column_config.TextColumn("Avg View Duration", width="small"),
             "Impressions": st.column_config.TextColumn("Impressions", width="small"),
             "CTR (%)": st.column_config.TextColumn("CTR (%)", width="small"),
