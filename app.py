@@ -386,12 +386,24 @@ def main():
     st.header("📁 Upload CSV File")
     st.markdown("✅ API key validated - you can now upload your CSV file")
 
-    uploaded_files = st.file_uploader(
-        "➕ Add CSV files",
-        type="csv",
-        help="Upload one or more CSV files exported from YouTube Analytics",
-        accept_multiple_files=True,
-    )
+    if "upload_slot_count" not in st.session_state:
+        st.session_state.upload_slot_count = 1
+
+    uploaded_files: List = []
+
+    for slot_index in range(st.session_state.upload_slot_count):
+        uploaded = st.file_uploader(
+            f"CSV file #{slot_index + 1}",
+            type="csv",
+            key=f"csv_uploader_{slot_index}",
+            help="Upload a CSV exported from YouTube Analytics",
+        )
+        if uploaded is not None:
+            uploaded_files.append(uploaded)
+
+    if st.button("➕ Add another CSV", use_container_width=True):
+        st.session_state.upload_slot_count += 1
+        st.experimental_rerun()
 
     if uploaded_files:
         process_uploaded_files(uploaded_files, api_key)
