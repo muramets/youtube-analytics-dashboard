@@ -212,87 +212,67 @@ def display_video_analysis(categories: Dict[str, List[Dict[str, Any]]]) -> None:
         st.warning("No videos found to analyze. Please check your CSV file format.")
 
 
-def process_uploaded_file(uploaded_file, api_key: str) -> None:
-    """Process uploaded CSV file and display analysis with enhanced UX."""
+def process_uploaded_files(uploaded_files: List, api_key: str) -> None:
+    """Process multiple uploaded CSV files and display combined analysis."""
+    total_rows = 0
+    all_combined_data: List[Dict[str, Any]] = []
+    analyzer: Optional[YouTubeAnalyzer] = None
+
     try:
-        # Read CSV file with better encoding handling
-        try:
-            df = pd.read_csv(uploaded_file, encoding='utf-8', skiprows=1)
-        except UnicodeDecodeError:
-            df = pd.read_csv(uploaded_file, encoding='latin-1', skiprows=1)
-        
-        # Display file info
-        st.success(f"✅ File uploaded successfully! Found {len(df) + 1} rows.")
-        
-        # Validate CSV structure
-        is_valid, error_msg = validate_csv_structure(df)
-        if not is_valid:
-            st.error(f"❌ {error_msg}")
-            st.error("Please ensure you're uploading a valid YouTube Analytics export file.")
-            
-            # Show expected format help
-            with st.expander("ℹ️ Expected CSV Format"):
-                st.markdown("""
-                Your CSV should have:
-                - At least 3 rows (header, totals, data)
-                - At least 8 columns
-                - Traffic source in first column (format: YT_RELATED.{video_id})
-                - Impressions, CTR, Views, Duration, Watch Time in subsequent columns
-                """)
-            return
-        
-        # Skip header and total rows (first 2 rows)
-        data_df = df.copy()
-        
-        # Enhanced progress tracking
         progress_container = st.container()
         with progress_container:
             progress_bar = st.progress(0)
             status_text = st.empty()
-            
-            # Extract video IDs
-            status_text.text("🔍 Extracting video IDs...")
-            
-            try:
-                analyzer = YouTubeAnalyzer(api_key)
-            except ValueError as e:
-                st.error(f"❌ API Key Error: {str(e)}")
-                return
-            
-            video_ids, csv_data = extract_video_data_from_csv(data_df, analyzer)
-            
-            progress_bar.progress(25)
-            status_text.text(f"🎥 Found {len(video_ids)} unique videos. Fetching data from YouTube API...")
-            
-            if not video_ids:
-                st.error("❌ No valid YouTube video IDs found in the CSV file.")
-                st.info("💡 Make sure your CSV contains traffic source data in YT_RELATED.{video_id} format")
-                return
-            
-            # Show API fetch progress
-            if len(video_ids) > 50:
-                batches = (len(video_ids) + 49) // 50
-                status_text.text(f"📡 Fetching data in {batches} batch(es) from YouTube API...")
-            
-            # Fetch video data from YouTube API
-            video_data = analyzer.get_video_data(video_ids)
-            progress_bar.progress(75)
-            
-            # Combine CSV data with API data
-            status_text.text("⚙️ Processing and categorizing videos...")
-            combined_data = combine_csv_and_api_data(video_ids, csv_data, video_data, analyzer)
-            
-            progress_bar.progress(100)
-            status_text.text("✅ Processing complete!")
-            time.sleep(0.5)  # Reduced sleep time for better UX
-            
-        # Clear progress indicators
+
+            for file_index, uploaded_file in enumerate(uploaded_files, start=1):
+                status_text.text(f"📄 Processing file {file_index}/{len(uploaded_files)}: {uploaded_file.name}")
+
+                try:
+                    df = pd.read_csv(uploaded_file, encoding='utf-8', skiprows=1)
+                except UnicodeDecodeError:
+                    df = pd.read_csv(uploaded_file, encoding='latin-1', skiprows=1)
+
+                total_rows += len(df)
+
+                is_valid, error_msg = validate_csv_structure(df)
+                if not is_valid:
+                    st.error(f"❌ {uploaded_file.name}: {error_msg}")
+                    st.error("Please ensure you're uploading a valid YouTube Analytics export file.")
+                    continue
+
+                if analyzer is None:
+                    try:
+                        analyzer = YouTubeAnalyzer(api_key)
+                    except ValueError as e:
+                        st.error(f"❌ API Key Error: {str(e)}")
+                        return
+
+                video_ids, csv_data = extract_video_data_from_csv(df, analyzer)
+
+                if not video_ids:
+                    st.warning(f"No valid YouTube video IDs found in {uploaded_file.name}.")
+                    continue
+
+                status_text.text(f"📡 Fetching API data for {len(video_ids)} videos in {uploaded_file.name}...")
+                video_data = analyzer.get_video_data(video_ids)
+
+                combined_data = combine_csv_and_api_data(video_ids, csv_data, video_data, analyzer)
+                all_combined_data.extend(combined_data)
+
+                progress = file_index / len(uploaded_files)
+                progress_bar.progress(int(progress * 100))
+
         progress_container.empty()
-        
-        # Show processing results
-        total_processed = len(combined_data)
-        api_matched = sum(1 for v in combined_data if v.get('api_views', 0) > 0)
-        
+
+        if not all_combined_data:
+            st.warning("No valid video data found across uploaded files.")
+            return
+
+        st.success(f"✅ Processed {len(uploaded_files)} file(s). Total rows: {total_rows}.")
+
+        total_processed = len(all_combined_data)
+        api_matched = sum(1 for v in all_combined_data if v.get('api_views', 0) > 0)
+
         with st.expander("📊 Processing Summary", expanded=False):
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -302,33 +282,29 @@ def process_uploaded_file(uploaded_file, api_key: str) -> None:
             with col3:
                 match_rate = (api_matched / total_processed * 100) if total_processed > 0 else 0
                 st.metric("Match Rate", f"{match_rate:.1f}%")
-        
-        # Categorize videos by time periods
-        categories = categorize_videos(combined_data)
-        
-        # Display results
+
+        categories = categorize_videos(all_combined_data)
         display_summary(categories)
         st.markdown("---")
         display_video_analysis(categories)
-        
-        # Add download option for processed data
-        if st.button("💾 Download Processed Data as CSV"):
-            processed_df = _create_download_dataframe(combined_data)
+
+        if st.button("💾 Download Combined Data as CSV"):
+            processed_df = _create_download_dataframe(all_combined_data)
             csv_data = processed_df.to_csv(index=False)
             st.download_button(
                 label="📥 Download CSV",
                 data=csv_data,
-                file_name="youtube_analytics_processed.csv",
+                file_name="youtube_analytics_combined.csv",
                 mime="text/csv"
             )
-        
+
     except pd.errors.EmptyDataError:
-        st.error("❌ The uploaded file appears to be empty.")
+        st.error("❌ One of the uploaded files appears to be empty.")
     except pd.errors.ParserError as e:
         st.error(f"❌ Error parsing CSV file: {str(e)}")
-        st.error("Please check that your file is a valid CSV format.")
+        st.error("Please check that your files are in valid CSV format.")
     except Exception as e:
-        st.error(f"❌ Unexpected error processing file: {str(e)}")
+        st.error(f"❌ Unexpected error processing files: {str(e)}")
         st.error("Please try again or contact support if the issue persists.")
 
 
@@ -410,14 +386,15 @@ def main():
     st.header("📁 Upload CSV File")
     st.markdown("✅ API key validated - you can now upload your CSV file")
 
-    uploaded_file = st.file_uploader(
-        "Choose your YouTube analytics CSV file",
+    uploaded_files = st.file_uploader(
+        "➕ Add CSV files",
         type="csv",
-        help="Upload the CSV file exported from YouTube Analytics",
+        help="Upload one or more CSV files exported from YouTube Analytics",
+        accept_multiple_files=True,
     )
 
-    if uploaded_file is not None:
-        process_uploaded_file(uploaded_file, api_key)
+    if uploaded_files:
+        process_uploaded_files(uploaded_files, api_key)
 
 if __name__ == "__main__":
     main()
