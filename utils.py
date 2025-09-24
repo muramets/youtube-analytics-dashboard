@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Union
 
 
@@ -21,5 +22,19 @@ def format_number(num: Union[int, float, str, None]) -> str:
         return str(int(value))
     except (ValueError, TypeError):
         return "0"
+
+
+def format_date(date_str: str) -> str:
+    """Convert ISO date to DD.MM.YY string."""
+    if not date_str:
+        return ""
+
+    try:
+        if date_str.endswith("Z"):
+            date_str = date_str[:-1]
+        parsed = datetime.fromisoformat(date_str)
+        return parsed.strftime("%d.%m.%y")
+    except ValueError:
+        return ""
 
 

@@ -192,6 +192,11 @@ def display_summary(categories: Dict[str, List[Dict[str, Any]]]) -> None:
 
 def display_video_analysis(categories: Dict[str, List[Dict[str, Any]]]) -> None:
     """Display video analysis by time periods."""
+    hide_zero_duration = st.checkbox(
+        "Hide zero view duration",
+        value=True,
+        help="Hide videos with average view duration equal to zero",
+    )
     st.header("📺 Video Analysis by Time Periods")
 
     # Check if there are any videos to display
@@ -200,7 +205,7 @@ def display_video_analysis(categories: Dict[str, List[Dict[str, Any]]]) -> None:
     if has_videos:
         for category_name, videos in categories.items():
             if videos:  # Only show categories with videos
-                display_video_table(videos, category_name)
+                display_video_table(videos, category_name, hide_zero_duration)
     else:
         st.warning("No videos found to analyze. Please check your CSV file format.")
 

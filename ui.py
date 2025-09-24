@@ -4,7 +4,7 @@ import logging
 import pandas as pd
 import streamlit as st
 
-from utils import format_number
+from utils import format_number, format_date
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -57,7 +57,11 @@ def inject_base_css() -> None:
     )
 
 
-def display_video_table(videos_data: List[Dict[str, Any]], category_title: str) -> None:
+def display_video_table(
+    videos_data: List[Dict[str, Any]],
+    category_title: str,
+    hide_zero_duration: bool,
+) -> None:
     """Display videos in a scrollable dataframe sorted by Views desc.
 
     Args:
@@ -96,6 +100,11 @@ def display_video_table(videos_data: List[Dict[str, Any]], category_title: str) 
             except (ValueError, TypeError):
                 ctr_display = "0.00%"
 
+            # Hide rows with zero avg duration if requested
+            avg_duration = video.get("average_view_duration", "0:00")
+            if hide_zero_duration and (avg_duration in {"0:00", "0", 0, None, "00:00"}):
+                continue
+
             # Validate video ID
             video_id = video.get('video_id', '')
             video_url = f"https://www.youtube.com/watch?v={video_id}" if video_id else ""
@@ -103,6 +112,7 @@ def display_video_table(videos_data: List[Dict[str, Any]], category_title: str) 
             df_rows.append({
                 "Video Title": video.get("title", "Unknown"),
                 "Views": views_value,
+                "Published Date": format_date(video.get("published_at", "")),
                 "Avg View Duration": video.get("average_view_duration", "0:00"),
                 "Impressions": impressions,
                 "CTR (%)": ctr_display,
@@ -133,6 +143,7 @@ def display_video_table(videos_data: List[Dict[str, Any]], category_title: str) 
     desired_columns = [
         "Video Title",
         "Views",
+        "Published Date",
         "Avg View Duration", 
         "Impressions",
         "CTR (%)",
@@ -165,6 +176,7 @@ def display_video_table(videos_data: List[Dict[str, Any]], category_title: str) 
                 help="Click on the URL column to open the video"
             ),
             "Views": st.column_config.TextColumn("Views", width="small"),
+            "Published Date": st.column_config.TextColumn("Published Date", width="small"),
             "Avg View Duration": st.column_config.TextColumn("Avg View Duration", width="small"),
             "Impressions": st.column_config.TextColumn("Impressions", width="small"),
             "CTR (%)": st.column_config.TextColumn("CTR (%)", width="small"),
