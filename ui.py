@@ -109,9 +109,13 @@ def display_video_table(
             video_id = video.get('video_id', '')
             video_url = f"https://www.youtube.com/watch?v={video_id}" if video_id else ""
 
+            # Get CSV views (my views from this traffic source)
+            my_views = video.get("csv_views", 0)
+            
             row_data = {
                 "Video Title": video.get("title", "Unknown"),
                 "Views": views_value,
+                "My Views": my_views,
                 "Published Date": format_date(video.get("published_at", "")),
                 "Avg View Duration": video.get("average_view_duration", "0:00"),
                 "Impressions": impressions,
@@ -139,6 +143,7 @@ def display_video_table(
             df_rows.append({
                 "Video Title": "Error loading video",
                 "Views": 0,
+                "My Views": 0,
                 "Avg View Duration": "0:00",
                 "Impressions": 0,
                 "CTR (%)": "0.00%",
@@ -157,6 +162,7 @@ def display_video_table(
     desired_columns = [
         "Video Title",
         "Views",
+        "My Views",
         "Published Date",
         "Avg View Duration", 
         "Impressions",
@@ -190,6 +196,7 @@ def display_video_table(
 
     # Format numbers for display
     df["Views"] = df["Views"].apply(_format_views_column)
+    df["My Views"] = df["My Views"].apply(_format_views_column)
     df["Impressions"] = df["Impressions"].apply(_format_impressions_column)
 
     visible_rows = min(len(df), 10)
@@ -208,7 +215,8 @@ def display_video_table(
                 width="large", 
                 help="Click on the URL column to open the video"
             ),
-            "Views": st.column_config.TextColumn("Views", width="small", help="Total views"),
+            "Views": st.column_config.TextColumn("Views", width="small", help="Total views on YouTube"),
+            "My Views": st.column_config.TextColumn("My Views", width="small", help="Views I received from this traffic source"),
             "Published Date": st.column_config.TextColumn("Published Date", width="small", help="Video publish date"),
             "Avg View Duration": st.column_config.TextColumn("Avg View Duration", width="small"),
             "Impressions": st.column_config.TextColumn("Impressions", width="small"),

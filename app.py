@@ -57,22 +57,46 @@ def validate_csv_structure(df: pd.DataFrame) -> Tuple[bool, str]:
     if len(data_df) == 0:
         return False, "No data rows found in the CSV file"
     
-    if len(data_df.columns) < 8:
-        return False, f"CSV file has insufficient columns. Expected at least 8, found {len(data_df.columns)}"
+    # Check for required column (Traffic source)
+    if 'Traffic source' not in df.columns and 'traffic source' not in [col.lower() for col in df.columns]:
+        return False, "CSV file must contain 'Traffic source' column"
     
     return True, ""
 
 
+def _find_column_by_name(df: pd.DataFrame, possible_names: List[str]) -> Optional[str]:
+    """Find a column by checking multiple possible names (case-insensitive)."""
+    columns_lower = {col.lower(): col for col in df.columns}
+    for name in possible_names:
+        name_lower = name.lower()
+        if name_lower in columns_lower:
+            return columns_lower[name_lower]
+    return None
+
+
 @st.cache_data(ttl=1800)  # Cache for 30 minutes
 def extract_video_data_from_csv(data_df: pd.DataFrame, _analyzer: YouTubeAnalyzer) -> Tuple[List[str], Dict[str, Dict[str, Any]]]:
-    """Extract video IDs and data from CSV with caching."""
+    """Extract video IDs and data from CSV with caching. Automatically detects column positions."""
     video_ids = []
     csv_data = {}
     errors_count = 0
     
+    # Find column names dynamically (case-insensitive)
+    traffic_source_col = _find_column_by_name(data_df, ['traffic source', 'trafficsource', 'source'])
+    impressions_col = _find_column_by_name(data_df, ['impressions'])
+    ctr_col = _find_column_by_name(data_df, ['impressions click-through rate (%)', 'impressions click-through rate', 'ctr', 'ctr (%)'])
+    views_col = _find_column_by_name(data_df, ['views'])
+    avg_duration_col = _find_column_by_name(data_df, ['average view duration', 'avg view duration', 'avg duration'])
+    watch_time_col = _find_column_by_name(data_df, ['watch time (hours)', 'watch time', 'watch time hours'])
+    
+    # Validate that required columns exist
+    if not traffic_source_col:
+        st.error("❌ Required column 'Traffic source' not found in CSV")
+        return video_ids, csv_data
+    
     for idx, row in data_df.iterrows():
         try:
-            traffic_source = str(row.iloc[0])
+            traffic_source = str(row[traffic_source_col])
             video_id = _analyzer.extract_video_id(traffic_source)
             
             if video_id:
@@ -81,13 +105,13 @@ def extract_video_data_from_csv(data_df: pd.DataFrame, _analyzer: YouTubeAnalyze
                     video_ids.append(video_id)
                     csv_data[video_id] = {
                         'video_id': video_id,
-                        'impressions': _safe_int_conversion(row.iloc[3]),
-                        'impressions_ctr': _safe_float_conversion(row.iloc[4]),
-                        'csv_views': _safe_int_conversion(row.iloc[5]),
-                        'average_view_duration': str(row.iloc[6]) if pd.notna(row.iloc[6]) and row.iloc[6] else "0:00",
-                        'watch_time_hours': _safe_float_conversion(row.iloc[7])
+                        'impressions': _safe_int_conversion(row[impressions_col]) if impressions_col else 0,
+                        'impressions_ctr': _safe_float_conversion(row[ctr_col]) if ctr_col else 0.0,
+                        'csv_views': _safe_int_conversion(row[views_col]) if views_col else 0,
+                        'average_view_duration': str(row[avg_duration_col]) if avg_duration_col and pd.notna(row[avg_duration_col]) and row[avg_duration_col] else "0:00",
+                        'watch_time_hours': _safe_float_conversion(row[watch_time_col]) if watch_time_col else 0.0
                     }
-        except (IndexError, ValueError, TypeError) as e:
+        except (IndexError, ValueError, TypeError, KeyError) as e:
             errors_count += 1
             if errors_count <= 5:  # Only show first 5 errors to avoid spam
                 st.warning(f"Skipping row {idx}: {str(e)}")
@@ -347,8 +371,8 @@ def _create_download_dataframe(combined_data: List[Dict[str, Any]]) -> pd.DataFr
             'Title': video.get('title', ''),
             'Published Date': video.get('published_at', ''),
             'Category': video.get('category', ''),
-            'CSV Views': video.get('csv_views', 0),
             'API Views': video.get('api_views', 0),
+            'My Views': video.get('csv_views', 0),
             'Impressions': video.get('impressions', 0),
             'CTR (%)': video.get('impressions_ctr', 0),
             'Avg View Duration': video.get('average_view_duration', ''),
