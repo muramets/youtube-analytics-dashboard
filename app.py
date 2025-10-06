@@ -216,13 +216,19 @@ def display_summary(categories: Dict[str, List[Dict[str, Any]]]) -> None:
                 st.metric(display_name, len(videos))
 
 
-def display_video_analysis(categories: Dict[str, List[Dict[str, Any]]]) -> None:
+def display_all_videos_table(all_videos: List[Dict[str, Any]], hide_zero_duration: bool) -> None:
+    """Display all videos in a single table without date categorization."""
+    st.header("📊 All Videos - Combined View")
+    
+    if not all_videos:
+        st.warning("No videos found to display.")
+        return
+    
+    display_video_table(all_videos, f"All Videos ({len(all_videos)} total)", hide_zero_duration)
+
+
+def display_video_analysis(categories: Dict[str, List[Dict[str, Any]]], hide_zero_duration: bool) -> None:
     """Display video analysis by time periods."""
-    hide_zero_duration = st.checkbox(
-        "Hide zero view duration",
-        value=True,
-        help="Hide videos with average view duration equal to zero",
-    )
     st.header("📺 Video Analysis by Time Periods")
 
     # Check if there are any videos to display
@@ -339,10 +345,23 @@ def process_uploaded_files(uploaded_files: List, api_key: str, source_video_url:
                 match_rate = (api_matched / total_processed * 100) if total_processed > 0 else 0
                 st.metric("Match Rate", f"{match_rate:.1f}%")
 
+        # Checkbox for filtering zero duration videos
+        hide_zero_duration = st.checkbox(
+            "Hide zero view duration",
+            value=True,
+            help="Hide videos with average view duration equal to zero",
+        )
+        
+        # Display all videos in one table first
+        display_all_videos_table(all_combined_data, hide_zero_duration)
+        
+        st.markdown("---")
+        
+        # Display videos categorized by publication date
         categories = categorize_videos(all_combined_data)
         display_summary(categories)
         st.markdown("---")
-        display_video_analysis(categories)
+        display_video_analysis(categories, hide_zero_duration)
 
         if st.button("💾 Download Combined Data as CSV"):
             processed_df = _create_download_dataframe(all_combined_data)
