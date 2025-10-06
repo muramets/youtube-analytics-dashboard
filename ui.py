@@ -78,6 +78,11 @@ def display_video_table(
         f'<div class="time-period-header">{category_title} ({len(videos_data)} videos)</div>',
         unsafe_allow_html=True,
     )
+    
+    # Calculate totals for display before filtering
+    total_my_views_raw = sum(video.get("csv_views", 0) for video in videos_data)
+    total_impressions_raw = sum(_safe_int_conversion(video.get("impressions", 0)) for video in videos_data)
+    total_watch_time_raw = sum(_safe_float_conversion(video.get("watch_time_hours", 0)) for video in videos_data)
 
     # Prepare rows with better error handling
     df_rows: List[Dict[str, Any]] = []
@@ -194,40 +199,21 @@ def display_video_table(
         # Fallback to basic sort
         df = df.sort_values("Views", ascending=False)
 
-    # Calculate totals before formatting
-    total_my_views = df["My Views"].sum()
-    total_impressions = df["Impressions"].sum()
-    total_watch_time = df["Watch Time (hrs)"].sum()
-
     # Format numbers for display
     df["Views"] = df["Views"].apply(_format_views_column)
     df["My Views"] = df["My Views"].apply(_format_views_column)
     df["Impressions"] = df["Impressions"].apply(_format_impressions_column)
 
-    # Add total row at the end
-    total_row = {
-        "Video Title": "📊 TOTAL",
-        "Views": "—",
-        "My Views": format_number(total_my_views),
-        "Published Date": "—",
-        "Avg View Duration": "—",
-        "Impressions": format_number(total_impressions),
-        "CTR (%)": "—",
-        "Watch Time (hrs)": total_watch_time,
-        "Video URL": "",
-        "Type": "—",
-    }
-    
-    # Add empty values for comparison columns if they exist
-    for col in ["Common Title Words", "Common Description Words", "Common Tags", "Different Tags"]:
-        if col in df.columns:
-            total_row[col] = "—"
-    
-    # Append total row
-    df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
+    # Display summary metrics before table
+    metric_col1, metric_col2, metric_col3 = st.columns(3)
+    with metric_col1:
+        st.metric("📊 Total My Views", format_number(total_my_views_raw))
+    with metric_col2:
+        st.metric("📊 Total Impressions", format_number(total_impressions_raw))
+    with metric_col3:
+        st.metric("📊 Total Watch Time", f"{total_watch_time_raw:.1f} hrs")
 
-    # Adjust table height to show more rows including total
-    visible_rows = min(len(df), 11)  # Show up to 11 rows (10 data + 1 total)
+    visible_rows = min(len(df), 10)
     base_height = 70  # header + padding
     row_height = 38
     table_height = base_height + visible_rows * row_height
