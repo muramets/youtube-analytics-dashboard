@@ -48,14 +48,8 @@ def setup_sidebar() -> Optional[str]:
 
 def validate_csv_structure(df: pd.DataFrame) -> Tuple[bool, str]:
     """Validate CSV file structure and format."""
-    if len(df) < 3:  # Need header + total + at least one data row
-        return False, "CSV file must have at least 3 rows (header, total, and data)"
-    
-    # Skip header and total rows
-    data_df = df.iloc[2:]
-    
-    if len(data_df) == 0:
-        return False, "No data rows found in the CSV file"
+    if len(df) == 0:
+        return False, "CSV file is empty or contains no data rows"
     
     # Check for required column (Traffic source)
     if 'Traffic source' not in df.columns and 'traffic source' not in [col.lower() for col in df.columns]:
@@ -281,10 +275,18 @@ def process_uploaded_files(uploaded_files: List, api_key: str, source_video_url:
                 status_text.text(f"📄 Processing file {file_index}/{len(uploaded_files)}: {uploaded_file.name}")
 
                 try:
-                    df = pd.read_csv(uploaded_file, encoding='utf-8', skiprows=1)
+                    df = pd.read_csv(uploaded_file, encoding='utf-8')
                 except UnicodeDecodeError:
-                    df = pd.read_csv(uploaded_file, encoding='latin-1', skiprows=1)
+                    df = pd.read_csv(uploaded_file, encoding='latin-1')
 
+                # Remove the "Total" row (YouTube Analytics exports have a totals row)
+                if len(df) > 0:
+                    # Check if first row contains "Total" in any variation
+                    first_row_str = str(df.iloc[0].iloc[0]).strip() if len(df.iloc[0]) > 0 else ""
+                    if first_row_str.lower() == 'total':
+                        df = df.iloc[1:]  # Skip the Total row
+                        df = df.reset_index(drop=True)
+                
                 total_rows += len(df)
 
                 is_valid, error_msg = validate_csv_structure(df)
