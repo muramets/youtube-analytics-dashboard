@@ -194,12 +194,40 @@ def display_video_table(
         # Fallback to basic sort
         df = df.sort_values("Views", ascending=False)
 
+    # Calculate totals before formatting
+    total_my_views = df["My Views"].sum()
+    total_impressions = df["Impressions"].sum()
+    total_watch_time = df["Watch Time (hrs)"].sum()
+
     # Format numbers for display
     df["Views"] = df["Views"].apply(_format_views_column)
     df["My Views"] = df["My Views"].apply(_format_views_column)
     df["Impressions"] = df["Impressions"].apply(_format_impressions_column)
 
-    visible_rows = min(len(df), 10)
+    # Add total row at the end
+    total_row = {
+        "Video Title": "📊 TOTAL",
+        "Views": "—",
+        "My Views": format_number(total_my_views),
+        "Published Date": "—",
+        "Avg View Duration": "—",
+        "Impressions": format_number(total_impressions),
+        "CTR (%)": "—",
+        "Watch Time (hrs)": total_watch_time,
+        "Video URL": "",
+        "Type": "—",
+    }
+    
+    # Add empty values for comparison columns if they exist
+    for col in ["Common Title Words", "Common Description Words", "Common Tags", "Different Tags"]:
+        if col in df.columns:
+            total_row[col] = "—"
+    
+    # Append total row
+    df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
+
+    # Adjust table height to show more rows including total
+    visible_rows = min(len(df), 11)  # Show up to 11 rows (10 data + 1 total)
     base_height = 70  # header + padding
     row_height = 38
     table_height = base_height + visible_rows * row_height
