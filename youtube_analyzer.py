@@ -75,14 +75,19 @@ class YouTubeAnalyzer:
 
     @st.cache_data(ttl=3600)  # Cache for 1 hour
     def get_video_data(_self, video_ids: List[str]) -> tuple[Dict[str, Dict], float]:
-        """Fetch video data from YouTube API in batches with caching."""
+        """Fetch video data from YouTube API in batches with caching.
+        
+        Returns:
+            tuple: (video_data dict, fetch_timestamp)
+                   fetch_timestamp is the time when data was fetched from API
+        """
         if not video_ids:
-            return {}, 0.0
+            return {}, time.time()
 
         video_data: Dict[str, Dict] = {}
         failed_batches = 0
         max_retries = 3
-        marker = time.time()
+        fetch_timestamp = time.time()  # Record when this fetch started
 
         for i in range(0, len(video_ids), 50):
             batch_ids = video_ids[i:i + 50]
@@ -105,11 +110,6 @@ class YouTubeAnalyzer:
                         logger.error(f"YouTube API error: {error_msg}")
                         st.error(f"YouTube API error: {error_msg}")
                         failed_batches += 1
-                        break
-
-                    if not data.get("items") and len(batch_ids) <= len(video_data):
-                        # Assume cache hit
-                        marker = data.get("nextPageToken", "")
                         break
 
                     for item in data.get("items", []):
@@ -159,7 +159,7 @@ class YouTubeAnalyzer:
         if failed_batches > 0:
             st.warning(f"Failed to fetch data for {failed_batches} batch(es). Some videos may be missing.")
 
-        return video_data, marker
+        return video_data, fetch_timestamp
 
     def fetch_source_video_metadata(self, video_url: str) -> Optional[Dict[str, Union[str, List[str]]]]:
         """Fetch metadata (title, description, tags) for the provided video URL."""

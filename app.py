@@ -97,12 +97,19 @@ def extract_video_data_from_csv(data_df: pd.DataFrame, _analyzer: YouTubeAnalyze
                 # Avoid duplicate video IDs
                 if video_id not in csv_data:
                     video_ids.append(video_id)
+                    # Handle empty values properly - preserve empty strings instead of converting to 0
+                    avg_duration_value = row[avg_duration_col] if avg_duration_col else None
+                    if pd.notna(avg_duration_value) and str(avg_duration_value).strip():
+                        avg_duration_str = str(avg_duration_value)
+                    else:
+                        avg_duration_str = ""  # Empty string for missing data
+                    
                     csv_data[video_id] = {
                         'video_id': video_id,
                         'impressions': _safe_int_conversion(row[impressions_col]) if impressions_col else 0,
                         'impressions_ctr': _safe_float_conversion(row[ctr_col]) if ctr_col else 0.0,
                         'csv_views': _safe_int_conversion(row[views_col]) if views_col else 0,
-                        'average_view_duration': str(row[avg_duration_col]) if avg_duration_col and pd.notna(row[avg_duration_col]) and row[avg_duration_col] else "0:00",
+                        'average_view_duration': avg_duration_str,
                         'watch_time_hours': _safe_float_conversion(row[watch_time_col]) if watch_time_col else 0.0
                     }
         except (IndexError, ValueError, TypeError, KeyError) as e:
@@ -250,6 +257,7 @@ def process_uploaded_files(uploaded_files: List, api_key: str, source_video_url:
     cache_fetch_count = 0
     analyzer: Optional[YouTubeAnalyzer] = None
     source_metadata: Optional[Dict[str, Union[str, List[str]]]] = None
+    request_start_time = time.time()  # Track when processing started
 
     try:
         # Initialize analyzer first
@@ -308,12 +316,14 @@ def process_uploaded_files(uploaded_files: List, api_key: str, source_video_url:
                     continue
 
                 status_text.text(f"📡 Fetching API data for {len(video_ids)} videos in {uploaded_file.name}...")
-                video_data, marker = analyzer.get_video_data(video_ids)
+                video_data, fetch_timestamp = analyzer.get_video_data(video_ids)
 
                 combined_data = combine_csv_and_api_data(video_ids, csv_data, video_data, analyzer, source_metadata)
                 all_combined_data.extend(combined_data)
 
-                if marker:
+                # Determine if data came from cache by comparing timestamps
+                # If fetch timestamp is older than when we started processing (minus 2 sec tolerance), it's from cache
+                if fetch_timestamp < request_start_time - 2:
                     cache_fetch_count += len(video_ids)
                 else:
                     api_fetch_count += len(video_ids)
@@ -347,9 +357,9 @@ def process_uploaded_files(uploaded_files: List, api_key: str, source_video_url:
 
         # Checkbox for filtering zero duration videos
         hide_zero_duration = st.checkbox(
-            "Hide zero view duration",
-            value=True,
-            help="Hide videos with average view duration equal to zero",
+            "Скрыть строки с нулевым AVD",
+            value=False,
+            help="Скрыть видео с нулевым или пустым Average View Duration",
         )
         
         # Display all videos in one table first

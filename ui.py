@@ -79,14 +79,37 @@ def display_video_table(
         unsafe_allow_html=True,
     )
     
-    # Calculate totals for display before filtering
-    total_my_views_raw = sum(video.get("csv_views", 0) for video in videos_data)
-    total_impressions_raw = sum(_safe_int_conversion(video.get("impressions", 0)) for video in videos_data)
-    total_watch_time_raw = sum(_safe_float_conversion(video.get("watch_time_hours", 0)) for video in videos_data)
+    # Add compact search by title
+    # Use category_title as part of the key to make it unique for each table
+    search_key = f"search_{category_title.replace(' ', '_').replace('-', '_')}"
+    search_query = st.text_input(
+        "🔍 Поиск по названию",
+        key=search_key,
+        placeholder="Введите название видео для поиска...",
+        label_visibility="collapsed"
+    )
+    
+    # Filter videos by search query if provided
+    filtered_videos = videos_data
+    if search_query and search_query.strip():
+        search_lower = search_query.strip().lower()
+        filtered_videos = [
+            video for video in videos_data 
+            if search_lower in video.get("title", "").lower()
+        ]
+        
+        if not filtered_videos:
+            st.warning(f"Не найдено видео с названием, содержащим '{search_query}'")
+            return
+    
+    # Calculate totals for display before hide_zero_duration filtering (but after search filtering)
+    total_my_views_raw = sum(video.get("csv_views", 0) for video in filtered_videos)
+    total_impressions_raw = sum(_safe_int_conversion(video.get("impressions", 0)) for video in filtered_videos)
+    total_watch_time_raw = sum(_safe_float_conversion(video.get("watch_time_hours", 0)) for video in filtered_videos)
 
     # Prepare rows with better error handling
     df_rows: List[Dict[str, Any]] = []
-    for video in videos_data:
+    for video in filtered_videos:
         try:
             # Get views with priority to API views
             api_views = video.get("api_views", 0)
@@ -105,24 +128,28 @@ def display_video_table(
             except (ValueError, TypeError):
                 ctr_display = "0.00%"
 
-            # Hide rows with zero avg duration if requested
-            avg_duration = video.get("average_view_duration", "0:00")
-            if hide_zero_duration and (avg_duration in {"0:00", "0", 0, None, "00:00"}):
+            # Hide rows with zero/empty avg duration if requested
+            avg_duration = video.get("average_view_duration", "")
+            # Include "-" (empty/missing data) as zero value for filtering purposes
+            if hide_zero_duration and avg_duration in {"0:00", "0", "00:00", "0:0", "-", ""}:
                 continue
+            
+            # Get CSV views (my views from this traffic source)
+            my_views = video.get("csv_views", 0)
 
             # Validate video ID
             video_id = video.get('video_id', '')
             video_url = f"https://www.youtube.com/watch?v={video_id}" if video_id else ""
-
-            # Get CSV views (my views from this traffic source)
-            my_views = video.get("csv_views", 0)
+            
+            # Display empty avg_duration as "-" instead of empty string for clarity
+            avg_duration_display = avg_duration if avg_duration else "-"
             
             row_data = {
                 "Video Title": video.get("title", "Unknown"),
                 "Views": views_value,
                 "My Views": my_views,
                 "Published Date": format_date(video.get("published_at", "")),
-                "Avg View Duration": video.get("average_view_duration", "0:00"),
+                "Avg View Duration": avg_duration_display,
                 "Impressions": impressions,
                 "CTR (%)": ctr_display,
                 "Watch Time (hrs)": watch_time,
@@ -149,7 +176,8 @@ def display_video_table(
                 "Video Title": "Error loading video",
                 "Views": 0,
                 "My Views": 0,
-                "Avg View Duration": "0:00",
+                "Published Date": "",
+                "Avg View Duration": "-",
                 "Impressions": 0,
                 "CTR (%)": "0.00%",
                 "Watch Time (hrs)": 0.0,
@@ -158,10 +186,17 @@ def display_video_table(
             })
 
     if not df_rows:
-        st.warning(f"No valid video data found for {category_title}")
+        if search_query:
+            st.warning(f"Нет видео, соответствующих поисковому запросу в категории {category_title}")
+        else:
+            st.warning(f"No valid video data found for {category_title}")
         return
 
     df = pd.DataFrame(df_rows)
+    
+    # Update the count display if search is active
+    if search_query and search_query.strip():
+        st.caption(f"📊 Показано {len(df_rows)} из {len(videos_data)} видео")
     
     # Enforce column order explicitly
     desired_columns = [
